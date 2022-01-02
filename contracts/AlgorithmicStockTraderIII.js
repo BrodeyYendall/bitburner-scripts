@@ -1,42 +1,42 @@
 export function calculate(ns, contractData) {
-    var possibleMins = [0];
-    var profits = [];
+    let possibleMins = [0];
+    let profits = [];
 
-    var previousValue = contractData[0];
-    for(var i = 1; i < contractData.length; i++) {
-        if(contractData[i] < previousValue) {
-            for(var min of possibleMins) {
-                if(contractData[min] < previousValue) {
+    let previousValue = contractData[0];
+    for (let i = 1; i < contractData.length; i++) {
+        if (contractData[i] < previousValue) {
+            for (let min of possibleMins) {
+                if (contractData[min] < previousValue) {
                     profits.push(new Profit(min, i - 1, contractData));
                 }
             }
 
-        } else if(contractData[i] > previousValue) {
+        } else if (contractData[i] > previousValue) {
             possibleMins.push(i - 1);
         }
         previousValue = contractData[i];
     }
 
-    for(var min of possibleMins) {
-        if(contractData[min] < previousValue) {
+    for (var min of possibleMins) {
+        if (contractData[min] < previousValue) {
             profits.push(new Profit(min, i - 1, contractData));
         }
     }
 
-    var maxProfit = Number.MIN_VALUE;
-    for(var profit of profits) {
-        var currentProfit = profit;
-        for(var subProfit of profits) {
-            if(subProfit.maxIndex < currentProfit.minIndex || subProfit.minIndex > currentProfit.maxIndex) {
-                var profit = subProfit.profit + currentProfit.profit;
+    let maxProfit = Number.MIN_VALUE;
+    for (let profit of profits) {
+        let currentProfit = profit;
+        for (let subProfit of profits) {
+            if (subProfit.maxIndex < currentProfit.minIndex || subProfit.minIndex > currentProfit.maxIndex) {
+                let moneyProfit = subProfit.profit + currentProfit.profit;
 
-                if(profit > maxProfit) {
-                    maxProfit = profit;
+                if (moneyProfit > maxProfit) {
+                    maxProfit = moneyProfit;
                 }
             }
         }
 
-        if(currentProfit.profit > maxProfit) {
+        if (currentProfit.profit > maxProfit) {
             maxProfit = currentProfit.profit;
         }
     }

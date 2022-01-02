@@ -1,8 +1,8 @@
-var CORE_CUTOFF = 100000;
+const CORE_CUTOFF = 100000;
 
 export function neededGrowthServers(ns, server, growAmount = 0, isPerformanceIndicator = true) {
-    var currentBalance;
-    var currentSecurity;
+    let currentBalance;
+    let currentSecurity;
     if (isPerformanceIndicator) {
         currentBalance = server.moneyMax - growAmount;
         currentSecurity = server.minDifficulty;
@@ -15,8 +15,8 @@ export function neededGrowthServers(ns, server, growAmount = 0, isPerformanceInd
         currentBalance = 1;
     }
 
-    var targetBalance;
-    var amountToGrow;
+    let targetBalance;
+    let amountToGrow;
     if (growAmount === 0) {
         targetBalance = server.moneyMax;
         amountToGrow = targetBalance - currentBalance;
@@ -25,18 +25,17 @@ export function neededGrowthServers(ns, server, growAmount = 0, isPerformanceInd
         targetBalance = currentBalance + growAmount;
     }
 
-    var cores;
+    let cores;
     if (isPerformanceIndicator) {
         cores = Math.log(targetBalance / (server.moneyMax - amountToGrow)) / Math.log(calculateServerGrowth(ns, server, ns.getPlayer(), 1, server.minDifficulty));
     } else {
-        var cores;
         for (cores = 0; currentBalance < targetBalance && cores < CORE_CUTOFF; cores++) {
             const serverGrowth = calculateServerGrowth(ns, server, ns.getPlayer(), 1, currentSecurity);
             currentBalance *= serverGrowth;
             currentSecurity += 0.004;
         }
 
-        if(cores >= CORE_CUTOFF) {
+        if (cores >= CORE_CUTOFF) {
             ns.tprint("*** Possible error, reached max grow estimation. Server balance might be so low its impractical to grow or actually need this many grows");
             throw "Possible error, reached max grow estimation. Server balance might be so low its impractical to grow or actually need this many grows";
         }
@@ -45,33 +44,33 @@ export function neededGrowthServers(ns, server, growAmount = 0, isPerformanceInd
     return cores;
 }
 
-export function determineMaxHack(ns, server, growServers, isPerformanceIndicator=false) {
-    var originalBalance;
-    if(isPerformanceIndicator) {
+export function determineMaxHack(ns, server, growServers, isPerformanceIndicator = false) {
+    let originalBalance;
+    if (isPerformanceIndicator) {
         originalBalance = server.moneyMax;
     } else {
         originalBalance = ns.getServerMoneyAvailable(server.hostname);
-        if(originalBalance < server.moneyMax - 1000) {
+        if (originalBalance < server.moneyMax - 1000) {
             ns.tprint("Server not completely grown");
             throw "Server not completely grown"
         }
 
     }
 
-    var currentBalance = originalBalance;
+    let currentBalance = originalBalance;
 
-    var currentSecurity;
-    if(isPerformanceIndicator) {
+    let currentSecurity;
+    if (isPerformanceIndicator) {
         currentSecurity = server.minDifficulty;
     } else {
         currentSecurity = ns.getServerSecurityLevel(server.hostname);
-        if(currentSecurity != server.minDifficulty) {
-            ns.tprint("Got current security " + currentSecurity + " when it should be " + minDifficulty);
+        if (currentSecurity !== server.minDifficulty) {
+            ns.tprint("Got current security " + currentSecurity + " when it should be " + server.minDifficulty);
         }
     }
 
 
-    for (var i = 0; i < growServers && currentBalance > 1000; i++) {
+    for (let i = 0; i < growServers && currentBalance > 1000; i++) {
         const serverGrowth = calculateServerGrowth(ns, server, ns.getPlayer(), 1, currentSecurity);
         currentBalance /= serverGrowth;
         currentSecurity += 0.004 // We are growing in reverse but the security level isn't currently simulated if we subtract. Adding correctly simulates the changes
@@ -81,9 +80,9 @@ export function determineMaxHack(ns, server, growServers, isPerformanceIndicator
     }
 
 
-    var player = ns.getPlayer();
+    const player = ns.getPlayer();
     const percentageHacked = calculatePercentMoneyHacked(ns, server, player, server.minDifficulty);
-    if(percentageHacked <= 0) {
+    if (percentageHacked <= 0) {
         return {
             hackCores: 0,
             amountHacked: 0
@@ -97,8 +96,8 @@ export function determineMaxHack(ns, server, growServers, isPerformanceIndicator
     // topBalance - lowBalance = Math.floor(topBalance * percentHacked) * x
     // (topBalance - lowBalance) / Math.floor(topBalance * percentHacked) =  x
 
-    var amountHacked = originalBalance - currentBalance;
-    var hackCores = (amountHacked) / Math.floor(originalBalance * percentageHacked);
+    const amountHacked = originalBalance - currentBalance;
+    const hackCores = (amountHacked) / Math.floor(originalBalance * percentageHacked);
 
     return {
         hackCores: hackCores,
@@ -112,7 +111,6 @@ export function determineMaxHack(ns, server, growServers, isPerformanceIndicator
    The following code is taken from the game source code. I have made small changes but the overall formulas remain the same
 
 ************* */
-
 
 
 /**
@@ -130,11 +128,8 @@ export function calculateHackingTime(server, player, securityLevel = -1) {
     skillFactor /= player.hacking + baseSkill;
 
     const hackTimeMultiplier = 5;
-    const hackingTime =
-        (hackTimeMultiplier * skillFactor) /
+    return (hackTimeMultiplier * skillFactor) /
         (player.hacking_speed_mult * calculateIntelligenceBonus(player.intelligence, 1));
-
-    return hackingTime;
 }
 
 
@@ -171,7 +166,7 @@ export function calculatePercentMoneyHacked(ns, server, player, securityLevel = 
     // Adjust if needed for balancing. This is the divisor for the final calculation
     const balanceFactor = 240;
 
-    var hackingDifficulty;
+    let hackingDifficulty;
     if (securityLevel === 0) {
         hackingDifficulty = server.hackDifficulty;
     } else {
@@ -210,15 +205,6 @@ export function calculateWeakenTime(server, player, securityLevel = -1) {
     return weakenTimeMultiplier * calculateHackingTime(server, player, securityLevel);
 }
 
-
-/**
- * Returns the number of "growth cycles" needed to grow the specified server by the
- * specified amount.
- * @param server - Server being grown
- * @param growth - How much the server is being grown by, in DECIMAL form (e.g. 1.5 rather than 50)
- * @param p - Reference to Player object
- * @returns Number of "growth cycles" needed
- */
 export function numCycleForGrowth(ns, server, growth, player, cores = 1, ignoreHackingLevel = false) {
     // const hackingDifficulty = ignoreHackingLevel ? 0 : server.hackDifficulty
     // const ServerBaseGrowthRate = 1.0;

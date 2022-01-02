@@ -1,11 +1,11 @@
 export function calculate(ns, contractData) {
-    var factors = getFactors(contractData)
+    let factors = getFactors(contractData)
     // ns.tprint(factors);
 
-    var largestFactor = Number.MIN_VALUE;
-    for(var factor of factors) {
-        var subFactors = getFactors(factor, true);
-        if(subFactors.length === 0) {
+    let largestFactor = Number.MIN_VALUE;
+    for (let factor of factors) {
+        let subFactors = getFactors(factor, true);
+        if (subFactors.length === 0) {
             largestFactor = factor;
         }
     }
@@ -14,10 +14,10 @@ export function calculate(ns, contractData) {
 }
 
 export function getFactors(number, filterObvious = false) {
-    var factors = new Array();
-    for(var i = 1; i <= number; i++) {
-        if(number % i === 0) {
-            if(filterObvious && (i === 1 || i === number)) {
+    let factors = [];
+    for (let i = 1; i <= number; i++) {
+        if (number % i === 0) {
+            if (filterObvious && (i === 1 || i === number)) {
                 continue;
             }
             factors.push(i)

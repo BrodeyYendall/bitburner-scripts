@@ -1,7 +1,7 @@
 export class Hacker {
     constructor(ns) {
         this.ns = ns;
-        this.hackOptions = new Array();
+        this.hackOptions = [];
 
         this.HACK_OPTION_MAP = [
             {file: "brutessh.exe", command: this.ns.brutessh},
@@ -15,7 +15,7 @@ export class Hacker {
     }
 
     refreshHackOptions() {
-        for(var i = this.hackOptions.length; i < this.HACK_OPTION_MAP.length; i++) {
+        for (let i = this.hackOptions.length; i < this.HACK_OPTION_MAP.length; i++) {
             if (!this.ns.fileExists(this.HACK_OPTION_MAP[i].file)) {
                 return;
             }
@@ -24,13 +24,13 @@ export class Hacker {
     }
 
     hackServer(serverName) {
-        var numPortsRequired = this.ns.getServerNumPortsRequired(serverName);
+        let numPortsRequired = this.ns.getServerNumPortsRequired(serverName);
         if (this.hackOptions.length < numPortsRequired) {
             this.ns.tprint(serverName + " needs " + numPortsRequired + " open ports");
             return false;
         }
 
-        for (var i = 0; i < numPortsRequired; i++) {
+        for (let i = 0; i < numPortsRequired; i++) {
             this.hackOptions[i](serverName);
         }
 

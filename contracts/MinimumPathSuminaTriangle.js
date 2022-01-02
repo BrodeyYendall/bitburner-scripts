@@ -1,6 +1,6 @@
 export function calculate(ns, contractData) {
-    var toVisit = [new Node(0, 0, 0, null)];
-    var currentBest = Number.MAX_VALUE;
+    let toVisit = [new Node(0, 0, 0, null)];
+    let currentBest = Number.MAX_VALUE;
     // var bestNode;
 
     // ns.tprint(contractData.length);
@@ -8,11 +8,11 @@ export function calculate(ns, contractData) {
     // 	ns.tprint(data);
     // }
 
-    for (var i = 0; i < toVisit.length; i++) {
+    for (let i = 0; i < toVisit.length; i++) {
         if(toVisit[i].level < contractData.length) {
             // ns.tprint(`${contractData[toVisit[i].level][toVisit[i].index]} + ${toVisit[i].cost}`)
-            var childCost = contractData[toVisit[i].level][toVisit[i].index] + toVisit[i].cost;
-            var childLevel = toVisit[i].level + 1
+            let childCost = contractData[toVisit[i].level][toVisit[i].index] + toVisit[i].cost;
+            let childLevel = toVisit[i].level + 1
 
             // ns.tprint(`cost: ${childCost}, level: ${childLevel}, index: ${toVisit[i].index}, parent: ${JSON.stringify(toVisit[i])}`);
             toVisit.push(new Node(childLevel, toVisit[i].index, childCost, toVisit[i]));

@@ -1,7 +1,7 @@
 import * as Formulas from "editted-formula.js"
 
 // The following are constants so that all server performance analysis are based on the same threads.
-var GROW_THREADS = 1000;
+const GROW_THREADS = 1000;
 
 export class Server {
     constructor(ns, name, server) {
@@ -24,13 +24,13 @@ export class Server {
 
     analyzeServerPerformance(ns, growThreads = GROW_THREADS) {
         if (this.server.moneyMax > 0) {
-            var player = ns.getPlayer();
+            const player = ns.getPlayer();
 
-            var maxHackResult = Formulas.determineMaxHack(ns, this.server, growThreads, true);
-            var amountHacked = maxHackResult.amountHacked * Formulas.calculateHackingChance(this.server, player, true);
-            var numOfHack = maxHackResult.hackCores;
+            const maxHackResult = Formulas.determineMaxHack(ns, this.server, growThreads, true);
+            const amountHacked = maxHackResult.amountHacked * Formulas.calculateHackingChance(this.server, player, true);
+            const numOfHack = maxHackResult.hackCores;
 
-            if(numOfHack <= 0) {
+            if (numOfHack <= 0) {
                 return {
                     score: 0,
                     amountHacked: 0,
@@ -42,13 +42,13 @@ export class Server {
                 };
             }
 
-            var growTime = Formulas.calculateGrowTime(this.server, player);
-            var postGrowWeakenTime = Formulas.calculateWeakenTime(this.server, player, this.server.minDifficulty + growThreads * 0.004);
-            var postHackWeakenTime = Formulas.calculateWeakenTime(this.server, player, this.server.minDifficulty + numOfHack * 0.002);
-            var hackTime = Formulas.calculateHackingTime(this.server, player);
+            const growTime = Formulas.calculateGrowTime(this.server, player);
+            const postGrowWeakenTime = Formulas.calculateWeakenTime(this.server, player, this.server.minDifficulty + growThreads * 0.004);
+            const postHackWeakenTime = Formulas.calculateWeakenTime(this.server, player, this.server.minDifficulty + numOfHack * 0.002);
+            const hackTime = Formulas.calculateHackingTime(this.server, player);
 
 
-            var score = amountHacked / (growTime + postGrowWeakenTime + postHackWeakenTime + hackTime);
+            const score = amountHacked / (growTime + postGrowWeakenTime + postHackWeakenTime + hackTime);
 
             return {
                 score: score,

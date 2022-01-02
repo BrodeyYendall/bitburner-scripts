@@ -1,13 +1,13 @@
 export function calculate(ns, contractData) {
-    var ways = [];
+    let ways = [];
     ways[0] = 1;
 
-    for (var a = 1; a <= contractData; a++) {
+    for (let a = 1; a <= contractData; a++) {
         ways[a] = 0;
     }
 
-    for (var i = 1; i <= contractData - 1; i++) {
-        for (var j = i; j <= contractData; j++) {
+    for (let i = 1; i <= contractData - 1; i++) {
+        for (let j = i; j <= contractData; j++) {
             ways[j] += ways[j - i];
         }
     }

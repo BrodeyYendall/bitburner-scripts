@@ -1,11 +1,11 @@
 export function calculate(ns, contractData) {
-    var totalProfit = 0;
-    var currentMin = contractData[0];
-    var previousValue = contractData[0];
-    for(var i = 1; i < contractData.length; i++) {
-        if(contractData[i] < previousValue) {
-            if(currentMin < previousValue) {
-                var profit = previousValue - currentMin;
+    let totalProfit = 0;
+    let currentMin = contractData[0];
+    let previousValue = contractData[0];
+    for (let i = 1; i < contractData.length; i++) {
+        if (contractData[i] < previousValue) {
+            if (currentMin < previousValue) {
+                let profit = previousValue - currentMin;
                 totalProfit += profit;
             }
             currentMin = contractData[i];
@@ -13,8 +13,8 @@ export function calculate(ns, contractData) {
         previousValue = contractData[i];
     }
 
-    if(currentMin < previousValue) {
-        var profit = previousValue - currentMin;
+    if (currentMin < previousValue) {
+        let profit = previousValue - currentMin;
         totalProfit += profit;
     }
 
