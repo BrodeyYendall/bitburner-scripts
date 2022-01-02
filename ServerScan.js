@@ -4,9 +4,12 @@ import {Hacker} from "Hacker.js"
 export function breathFirstScan(ns, hacker = new Hacker(ns), scanFrom = null, visited = []) {
     let toVisit;
     if (scanFrom === null) {
-        toVisit = ["home"];
+        toVisit = [new SearchServer("home", [])];
     } else {
-        toVisit = scanFrom;
+        toVisit = [];
+        for(let name of scanFrom) {
+            toVisit.push(new SearchServer(name, []));
+        }
     }
 
     let openServers = [];
@@ -14,7 +17,7 @@ export function breathFirstScan(ns, hacker = new Hacker(ns), scanFrom = null, vi
     let lockedServers = [];
 
     for (let i = 0; i < toVisit.length; i++) {
-        let neighbourName = toVisit[i];
+        let neighbourName = toVisit[i].name;
 
         if (visited.includes(neighbourName)) {
             continue;
@@ -34,7 +37,11 @@ export function breathFirstScan(ns, hacker = new Hacker(ns), scanFrom = null, vi
                 openServers.push(server);
             }
 
-            toVisit = toVisit.concat(ns.scan(neighbourName));
+            var copiedSource = JSON.parse(JSON.stringify(toVisit[i].source));
+            copiedSource.push(toVisit[i].name);
+            for(let scannedServer of ns.scan(neighbourName)) {
+                toVisit.push(new SearchServer(scannedServer, copiedSource));
+            }
         } else {
             lockedServers.push(neighbourName);
         }
@@ -44,6 +51,14 @@ export function breathFirstScan(ns, hacker = new Hacker(ns), scanFrom = null, vi
         openServers: openServers,
         rootedServers: rootedServers,
         lockedServers: lockedServers,
-        visited: visited
+        visited: visited,
+        toVisit: toVisit
     };
+}
+
+class SearchServer {
+    constructor(name, source) {
+        this.name = name;
+        this.source = source;
+    }
 }
