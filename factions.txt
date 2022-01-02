@@ -1,0 +1,6 @@
+Faction Completed:
+    CSEC
+    CyberSec
+    NiteSec
+    Four Sigma
+    Sector-12
