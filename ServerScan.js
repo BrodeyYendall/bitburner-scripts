@@ -7,7 +7,7 @@ export function breathFirstScan(ns, hacker = new Hacker(ns), scanFrom = null, vi
         toVisit = [new SearchServer("home", [])];
     } else {
         toVisit = [];
-        for(let name of scanFrom) {
+        for (let name of scanFrom) {
             toVisit.push(new SearchServer(name, []));
         }
     }
@@ -31,7 +31,6 @@ export function breathFirstScan(ns, hacker = new Hacker(ns), scanFrom = null, vi
 
             const hackingLevelRequired = ns.getServerRequiredHackingLevel(neighbourName)
             if (ns.getHackingLevel() < hackingLevelRequired) {
-                ns.print(neighbourName + " needs hacking level " + hackingLevelRequired + " to access");
                 rootedServers.push(server)
             } else {
                 openServers.push(server);
@@ -39,7 +38,7 @@ export function breathFirstScan(ns, hacker = new Hacker(ns), scanFrom = null, vi
 
             var copiedSource = JSON.parse(JSON.stringify(toVisit[i].source));
             copiedSource.push(toVisit[i].name);
-            for(let scannedServer of ns.scan(neighbourName)) {
+            for (let scannedServer of ns.scan(neighbourName)) {
                 toVisit.push(new SearchServer(scannedServer, copiedSource));
             }
         } else {
