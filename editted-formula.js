@@ -69,8 +69,8 @@ export function determineMaxHack(ns, server, growServers, isPerformanceIndicator
         }
     }
 
-
-    for (let i = 0; i < growServers && currentBalance > 1000; i++) {
+    let i = 0;
+    for (i; i < growServers && currentBalance > 1000; i++) {
         const serverGrowth = calculateServerGrowth(ns, server, ns.getPlayer(), 1, currentSecurity);
         currentBalance /= serverGrowth;
         currentSecurity += 0.004 // We are growing in reverse but the security level isn't currently simulated if we subtract. Adding correctly simulates the changes
@@ -78,7 +78,6 @@ export function determineMaxHack(ns, server, growServers, isPerformanceIndicator
             currentSecurity = server.minDifficulty;
         }
     }
-
 
     const player = ns.getPlayer();
     const percentageHacked = calculatePercentMoneyHacked(ns, server, player, server.minDifficulty);
@@ -88,10 +87,6 @@ export function determineMaxHack(ns, server, growServers, isPerformanceIndicator
             amountHacked: 0
         }
     }
-    // ns.tprint(`cb: ${currentBalance}, ob: ${originalBalance}, p: ${percentageHacked}`);
-
-    // (balance - (Math.floor(balance * percentHacked) * x)) * (percentGrown ^ y);
-
     // topBalance - (Math.floor(topBalance * percentHacked) * x) = lowBalance
     // topBalance - lowBalance = Math.floor(topBalance * percentHacked) * x
     // (topBalance - lowBalance) / Math.floor(topBalance * percentHacked) =  x

@@ -1,6 +1,23 @@
 Faction Completed:
-    CSEC
-    CyberSec
-    NiteSec
-    Four Sigma
-    Sector-12
+    The Black Hand
+
+# Faction To Complete:
+## Early Game
+    Netburners
+## City
+    New Tokyo
+    Ishima
+    Aevum -- Fairly sure this is done
+    Volhaven
+## Hacker
+    BitRunners
+## MegaCorp
+    MegaCorp
+    Blade Industries
+    KuaiGong International
+    NWO
+    OmniTek Incorporated
+    ECorp
+    Bachman & Associates
+    Clarke Incorporated
+    Fulcrum Secret Technologies

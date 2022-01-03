@@ -8,6 +8,9 @@ const GROW_SCRIPT_NAME = "grow.js";
 const HACK_SCRIPT_NAME = "hack.js";
 const WEAKEN_SCRIPT_NAME = "weaken.js";
 
+const DRAIN_HACK_SCRIPT_NAME = "drain-hack.js";
+const DRAIN_WEAKEN_SCRIPT_NAME = "drain-weaken.js";
+
 
 import * as Formulas from "editted-formula.js"
 import {Hacker} from "Hacker.js"
@@ -45,6 +48,9 @@ class ScriptManager {
     }
 
     async run() {
+        this.ns.disableLog('ALL');
+        this.ns.enableLog('exec');
+
         this.ns.clearPort(HACK_RESULT_PORT);
         this.ns.clearPort(GROW_RESULT_PORT);
         this.ns.clearPort(WEAKEN_RESULT_PORT);
@@ -54,61 +60,95 @@ class ScriptManager {
         let availableThreads;
         let previousHackLevel = -1;
 
-        await this.sortServers();
-        this.showLeaderBoard();
-
+        // noinspection InfiniteLoopJS
         while (true) {
             await this.updateAvailableServers(previousHackLevel);
-            this.selectBestServer();
 
             availableThreads = this.determineAvailableThreads();
             this.ns.tprint(availableThreads);
             await this.drainServers(availableThreads);
 
-            let securityLevel = this.ns.getServerSecurityLevel(this.bestServer.name);
-            if (securityLevel > this.bestServer.server.minDifficulty) {
-                let weakenNeeded = Math.ceil((securityLevel) / 0.05);
-                this.ns.tprint("Found that " + weakenNeeded + " weaken were needed for " + this.bestServer.name);
-                await this.performLargeOperation(WEAKEN_SCRIPT_NAME, weakenNeeded, WEAKEN_RESULT_PORT);
+            let targetServer = this.bestServer;
+
+            this.ns.tprint("here 1");
+            await this.performWeaken(availableThreads, targetServer);
+            this.ns.tprint("here 2");
+            if (await this.performGrow(availableThreads, targetServer)) {
+                this.ns.tprint("here 3");
+                await this.performWeaken(availableThreads, targetServer);
+                this.ns.tprint("here 4");
+                await this.performHack(availableThreads, targetServer);
             }
+        }
+    }
 
-            this.ns.tprint("Weaken resulted in a security level of: " + this.ns.getServerSecurityLevel(this.bestServer.name) + " with minimum: " + this.bestServer.server.minDifficulty);
+    async performWeaken(availableThreads, targetServer) {
+        let securityLevel = this.ns.getServerSecurityLevel(targetServer.name);
 
-            const preGrowBalance = this.ns.getServerMoneyAvailable(this.bestServer.name);
-            const growThreads = Formulas.neededGrowthServers(this.ns, this.bestServer.server, 0, false);
+        let estimatedWeakenTime = Formulas.calculateWeakenTime(targetServer.server, this.ns.getPlayer(), securityLevel);
+        if (securityLevel > targetServer.server.minDifficulty) {
+            let weakenNeeded = Math.ceil((Math.ceil(securityLevel - targetServer.server.minDifficulty)) / 0.05);
+            this.ns.tprint("Found that " + weakenNeeded + " weaken were needed for " + targetServer.name);
+            await this.performLargeOperation(WEAKEN_SCRIPT_NAME, weakenNeeded, -1, targetServer.name);
+            this.ns.tprint(`Sleeping for ${formatSeconds(estimatedWeakenTime)}`)
+            await this.ns.sleep(estimatedWeakenTime * 1000);
+        }
+        this.ns.tprint("Weaken resulted in a security level of: " + this.ns.getServerSecurityLevel(targetServer.name) + " with minimum: " + targetServer.server.minDifficulty);
+    }
 
-            if(growThreads > availableThreads.growThreads) {
-                this.ns.tprint("Found that " + availableThreads.growThreads + " grows were needed for " + this.bestServer.name);
-                await this.performParallelOperations(GROW_SCRIPT_NAME, availableThreads.growThreads, GROW_RESULT_PORT);
-                this.ns.tprint(`Balance was \$${preGrowBalance} before the grow and \$${this.ns.getServerMoneyAvailable(this.bestServer.name)} after the grow. (Max: ${this.bestServer.server.moneyMax})`);
+    async performGrow(availableThreads, targetServer) {
+        const preGrowBalance = this.ns.getServerMoneyAvailable(targetServer.name);
+        const growThreads = Formulas.neededGrowthServers(this.ns, targetServer.server, 0, false);
 
+        let estimatedGrowTime = Formulas.calculateGrowTime(targetServer.server, this.ns.getPlayer(), this.ns.getServerSecurityLevel(targetServer.name));
+        this.ns.tprint(`Found that ${growThreads} grows were needed for ${targetServer.name}. Current balance is ${preGrowBalance} with max ${targetServer.server.moneyMax}`)
+        if (growThreads > availableThreads.growThreads) {
+            if (availableThreads.growThreads > 0) {
+                this.ns.tprint("Throttled down to " + availableThreads.growThreads + " grows that are needed for " + targetServer.name);
+                await this.performParallelOperations(GROW_SCRIPT_NAME, availableThreads.growThreads, GROW_RESULT_PORT, targetServer.server);
+
+                this.ns.tprint(`Sleeping for ${formatSeconds(estimatedGrowTime)}`)
+                await this.ns.sleep(estimatedGrowTime * 1000);
+
+                this.ns.tprint(`Balance was \$${preGrowBalance} before the grow and \$${this.ns.getServerMoneyAvailable(targetServer.name)} after the grow. (Max: ${targetServer.server.moneyMax})`);
                 this.ns.tprint("Skipping hack due to server not being fully grown");
-            } else {
-                this.ns.tprint("Found that " + growThreads + " grows were needed for " + this.bestServer.name);
-                await this.performParallelOperations(GROW_SCRIPT_NAME, growThreads, GROW_RESULT_PORT);
-                this.ns.tprint(`Balance was \$${preGrowBalance} before the grow and \$${this.ns.getServerMoneyAvailable(this.bestServer.name)} after the grow. (Max: ${this.bestServer.server.moneyMax})`);
-
-                securityLevel = this.ns.getServerSecurityLevel(this.bestServer.name)
-                if (securityLevel > this.bestServer.server.minDifficulty) {
-                    let weakenNeeded = Math.ceil((securityLevel) / 0.05);
-                    this.ns.tprint("Found that " + weakenNeeded + " weaken were needed for " + this.bestServer.name + " with minimum: " + this.bestServer.server.minDifficulty);
-                    await this.performLargeOperation(WEAKEN_SCRIPT_NAME, weakenNeeded, WEAKEN_RESULT_PORT);
-                }
-                this.ns.tprint("Weaken resulted in a security level of: " + this.ns.getServerSecurityLevel(this.bestServer.name));
-
-                let hackThreads = availableThreads.hackThreads;
-                const maxHack = Math.floor(Formulas.determineMaxHack(this.ns, this.bestServer.server, availableThreads.growThreads).hackCores);
-
-                if (maxHack < hackThreads) {
-                    this.ns.tprint("Throttling hack number due to poor growth. Max hack " + maxHack + " hack threads: " + hackThreads);
-                    hackThreads = maxHack;
-                }
-                this.ns.tprint("Starting " + hackThreads + " hack threads for " + this.bestServer.name)
-
-                const preHackBalance = this.ns.getServerMoneyAvailable(this.bestServer.name);
-                await this.performLargeOperation(HACK_SCRIPT_NAME, hackThreads, HACK_RESULT_PORT);
-                this.ns.tprint(`Balance was \$${preHackBalance} before the hack and \$${this.ns.getServerMoneyAvailable(this.bestServer.name)} after the hack`);
             }
+            return false;
+        } else {
+            if (growThreads > 0) {
+                await this.performParallelOperations(GROW_SCRIPT_NAME, growThreads, GROW_RESULT_PORT, targetServer);
+
+                this.ns.tprint(`Sleeping for ${formatSeconds(estimatedGrowTime)}`)
+                await this.ns.sleep(estimatedGrowTime * 1000);
+
+                this.ns.tprint(`Balance was \$${preGrowBalance} before the grow and \$${this.ns.getServerMoneyAvailable(targetServer.name)} after the grow. (Max: ${targetServer.server.moneyMax})`);
+            }
+            return true
+
+        }
+    }
+
+    async performHack(availableThreads, targetServer) {
+        const estimatedHackTime = Formulas.calculateHackingTime(targetServer.server, this.ns.getPlayer(), this.ns.getServerSecurityLevel(targetServer.name));
+        let hackThreads = availableThreads.hackThreads;
+        const maxHack = Math.floor(Formulas.determineMaxHack(this.ns, targetServer.server, availableThreads.growThreads).hackCores);
+
+        if (maxHack < hackThreads) {
+            this.ns.tprint("Throttling hack number due to poor growth. Max hack " + maxHack + " hack threads: " + hackThreads);
+            hackThreads = maxHack;
+        }
+
+        if(hackThreads > 0) {
+            this.ns.tprint("Starting " + hackThreads + " hack threads for " + targetServer.name)
+
+            const preHackBalance = this.ns.getServerMoneyAvailable(targetServer.name);
+            await this.performLargeOperation(HACK_SCRIPT_NAME, hackThreads, HACK_RESULT_PORT, targetServer.name);
+
+            this.ns.tprint(`Sleeping for ${formatSeconds(estimatedHackTime)}`)
+            await this.ns.sleep(estimatedHackTime * 1000);
+
+            this.ns.tprint(`Balance was \$${preHackBalance} before the hack and \$${this.ns.getServerMoneyAvailable(targetServer.name)} after the hack`);
+
         }
     }
 
@@ -165,8 +205,8 @@ class ScriptManager {
             let operation = this.neededDrainOperations[i];
             if (operation.weakenNeeded > 0) {
                 try {
-                    await this.performLargeOperation(WEAKEN_SCRIPT_NAME, operation.weakenNeeded, DRAIN_WEAKEN_RESULT_PORT, operation.server, false);
                     this.ns.tprint(`Starting drain weaken on ${operation.server} with ${operation.weakenNeeded} threads.`);
+                    await this.performLargeOperation(DRAIN_WEAKEN_SCRIPT_NAME, operation.weakenNeeded, DRAIN_WEAKEN_RESULT_PORT, operation.server);
                     operation.weakenNeeded = 0;
                     this.activateDrainOperations++;
                 } catch (e) {
@@ -175,8 +215,8 @@ class ScriptManager {
             }
             if (!operation.waitOnWeaken && operation.hackNeeded > 0) {
                 try {
-                    await this.performLargeOperation(HACK_SCRIPT_NAME, operation.hackNeeded, DRAIN_HACK_RESULT_PORT, operation.server, false);
                     this.ns.tprint(`Starting drain hack on ${operation.server} with ${operation.hackNeeded} threads.`);
+                    await this.performLargeOperation(DRAIN_HACK_SCRIPT_NAME, operation.hackNeeded, DRAIN_HACK_RESULT_PORT, operation.server);
                     operation.hackNeeded = 0;
                     this.activateDrainOperations++;
                 } catch (e) {
@@ -201,7 +241,7 @@ class ScriptManager {
             while (portResult !== "NULL PORT DATA") {
                 if(portResult.result === 0) {
                     this.ns.tprint(`Restarted drain hack on ${portResult.target} with ${portResult.identifier} threads. Active operations: ${this.activateDrainOperations}`);
-                    await this.performLargeOperation(HACK_SCRIPT_NAME, portResult.identifier, HACK_RESULT_PORT, portResult.target, false);
+                    await this.performLargeOperation(DRAIN_HACK_SCRIPT_NAME, portResult.identifier, HACK_RESULT_PORT, portResult.target, portResult.target);
                 } else {
                     let indexOfOperation = this.neededDrainOperations.findIndex(operation => operation.server === portResult.target);
                     this.neededDrainOperations.splice(indexOfOperation, 1);
@@ -255,7 +295,6 @@ class ScriptManager {
                 this.visited = scanResults.visited;
 
                 this.sortServers();
-                this.selectBestServer();
                 await this.prepareServers(this.openServers.concat(this.rootedServers));
                 this.showLeaderBoard();
 
@@ -265,9 +304,9 @@ class ScriptManager {
         return newHackingLevel;
     }
 
-    async performLargeOperation(scriptName, threads, port, target=this.bestServer.name, waitForResults = true) {
+    async performLargeOperation(scriptName, threads, port, target) {
         let usableServers = this.openServers.concat(this.rootedServers);
-        usableServers = usableServers.filter((server) => server.server.maxRam !== 0); // Remove any servers that don't have RAM
+        usableServers = usableServers.filter((server) => server.server.maxRam > 0); // Remove any servers that don't have RAM
 
         // Sort servers such that lower RAM are used first. This reserves the larger servers for large operations
         usableServers.sort((firstServer, secondServer) => firstServer.server.maxRam - secondServer.server.maxRam);
@@ -276,7 +315,7 @@ class ScriptManager {
         let scriptStarted = false;
         for(let server of usableServers) {
             if(server.server.maxRam - this.ns.getServerUsedRam(server.name) > ramNeeded) {
-                let processID = this.ns.exec(scriptName, server.name, threads, target, port, "home", threads, Math.random());
+                let processID = await this.ns.exec(scriptName, server.name, threads, target, port, "home", threads, Math.random());
 
                 if (processID === 0) {
                     throw "Failed to create " + scriptName + " for " + target;
@@ -288,24 +327,13 @@ class ScriptManager {
         }
 
         if(!scriptStarted) {
-            throw `Failed to start ${scriptName} with ${threads} threads on target ${target}`;
+            this.ns.tprint(`Failed to run ${scriptName} with ${threads} on target ${target}`);
         }
 
-        if(waitForResults) {
-            let waitingForResults = true;
-            while (waitingForResults) {
-                let portResult = this.ns.readPort(port);
-                if (portResult !== "NULL PORT DATA") {
-                    this.ns.print("Received " + scriptName + " complete, with result: " + portResult.result);
-                    waitingForResults = false;
-                } else {
-                    await this.ns.sleep(5000);
-                }
-            }
-        }
+        return new Date();
     }
 
-    async performParallelOperations(scriptName, numOfOperations, scriptPort) {
+    async performParallelOperations(scriptName, numOfOperations, scriptPort, targetServer) {
         let usableServers = this.openServers.concat(this.rootedServers);
         usableServers = usableServers.filter((server) => server.server.maxRam !== 0); // Remove any servers that don't have RAM
 
@@ -315,7 +343,7 @@ class ScriptManager {
         // Performs operation on each server available. Note that each operation is a separate script
         let activeThreads = 0;
         for (let server of usableServers) {
-            let availableRam = server.server.maxRam;
+            let availableRam = server.server.maxRam - this.ns.getServerUsedRam(server.name);
             if (server.name === "home") {
                 availableRam -= this.args["home-reserve"];
             }
@@ -325,10 +353,10 @@ class ScriptManager {
 
                 // Last two arguments are passed because you cannot run the same script with same arguments on the same server.
                 // The last two arguments fix this by providing arbitrary values
-                let processID = this.ns.exec(scriptName, server.name, 1, this.bestServer.name, scriptPort, server.name, activeThreads, "A");
+                let processID = await this.ns.exec(scriptName, server.name, 1, targetServer.name, scriptPort, server.name, activeThreads, "A");
 
                 if (processID === 0) {
-                    throw "Failed to create " + scriptName + " for " + this.bestServer.name
+                    throw "Failed to create " + scriptName + " for " + targetServer.name
                 }
                 // If scripts finish at the same time then it defeats the purpose of separate scripts. This sleep ensures that doesn't happen
                 await this.ns.sleep(1);
@@ -336,48 +364,7 @@ class ScriptManager {
             }
         }
 
-
-        let batchSize = activeThreads;
-        this.ns.print("Active threads: " + activeThreads + " of needed " + numOfOperations + " on " + usableServers.length + " usable servers");
-
-        // Start collecting successful scripts. If all operations weren't started in the previous block then scripts are restarted on completion
-        let successfulThreads = 0;
-
-
-        let currentBatchCount = 0;
-        while (successfulThreads < numOfOperations) {
-            let portResult = this.ns.readPort(scriptPort);
-            if (portResult !== "NULL PORT DATA") {
-                successfulThreads++;
-                currentBatchCount++;
-
-                if (activeThreads >= numOfOperations) {
-                    // this.ns.print(`${scriptName} from ${portResult.name} was successful. ${successfulThreads} of ${numOfOperations}`);
-                } else {
-                    // Last two arguments are passed because you cannot run the same script with same arguments on the same server.
-                    // The last two arguments fix this by providing arbitrary values
-                    let processID = this.ns.exec(scriptName, portResult.name, 1, this.bestServer.name, scriptPort, portResult.name, activeThreads, "R");
-
-                    if (processID === 0) {
-                        throw "Failed to create " + scriptName + " for " + this.bestServer.name
-                    }
-
-                    // If scripts finish at the same time then it defeats the purpose of separate scripts. This sleep ensures that doesn't happen
-                    await this.ns.sleep(1);
-                    activeThreads++;
-                }
-            } else {
-                if (currentBatchCount > 0 && currentBatchCount < batchSize) {
-                    await this.ns.sleep(1);
-                } else {
-                    this.ns.print(`${successfulThreads} of ${numOfOperations} completed so far. Active threads: ${activeThreads}`);
-                    if (currentBatchCount === batchSize) {
-                        currentBatchCount = 0;
-                    }
-                    await this.ns.sleep(5000);
-                }
-            }
-        }
+        return new Date();
     }
 
     determineAvailableThreads() {
@@ -445,6 +432,8 @@ class ScriptManager {
             await this.ns.scp(GROW_SCRIPT_NAME, "home", server.name);
             await this.ns.scp(HACK_SCRIPT_NAME, "home", server.name);
             await this.ns.scp(WEAKEN_SCRIPT_NAME, "home", server.name);
+            await this.ns.scp(DRAIN_HACK_SCRIPT_NAME, "home", server.name);
+            await this.ns.scp(DRAIN_WEAKEN_SCRIPT_NAME, "home", server.name);
 
             if(this.args["kill-existing"] === "yes") {
                 this.ns.scriptKill(GROW_SCRIPT_NAME, server.name);
@@ -453,6 +442,25 @@ class ScriptManager {
             }
         }
         // For some reason executing a script quickly after a SCP results in an error. This sleep prevents such error
-        await this.ns.sleep(100);
+        await this.ns.sleep(500);
     }
+}
+
+function formatSeconds(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    seconds -= hours * 3600;
+    const minutes = Math.floor(seconds / 60);
+    seconds -= minutes * 60;
+
+    let string = "";
+    if(hours > 0) {
+        string += `${hours} hours `;
+    }
+    if(minutes > 0) {
+        string += `${minutes} minutes `;
+    }
+
+    string += `${seconds} seconds`;
+
+    return string;
 }

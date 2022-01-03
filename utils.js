@@ -18,6 +18,10 @@ export async function main(ns) {
 }
 
 export function findServer(ns, args) {
+    if(args["values"] === null) {
+        ns.tprint("No value received, please use the --values flag");
+        return;
+    }
     let search = ServerScan.breathFirstScan(ns);
 
     let searchedServer = search.toVisit.find(node => node.name === args["values"]);
