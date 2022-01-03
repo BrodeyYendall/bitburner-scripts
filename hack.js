@@ -8,7 +8,8 @@ export async function main(ns) {
         wroteToPort = await ns.tryWritePort(ns.args[1], {
             name: ns.args[2],
             result: hackResult,
-            identifier: ns.args[3]
+            identifier: ns.args[3],
+            target: ns.args[0]
         });
     }
 }
