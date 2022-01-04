@@ -3,11 +3,9 @@
     Netburners
 ## City
     New Tokyo -- Think this is done
-    Ishima
+    Ishima -- Didn't complete but its just a combat augment
     Aevum -- Fairly sure this is done
     Volhaven
-## Hacker
-    BitRunners
 ## MegaCorp
     MegaCorp
     Blade Industries

@@ -11,6 +11,8 @@ const WEAKEN_SCRIPT_NAME = "weaken.js";
 const DRAIN_HACK_SCRIPT_NAME = "drain-hack.js";
 const DRAIN_WEAKEN_SCRIPT_NAME = "drain-weaken.js";
 
+const DRAIN_OPERATION_FAILED_WAIT_TIME = 10000;
+
 
 import * as Formulas from "editted-formula.js"
 import {Hacker} from "Hacker.js"
@@ -39,7 +41,6 @@ class ScriptManager {
         this.ns = ns;
         this.args = args;
         this.hacker = new Hacker(ns);
-        this.activateDrainOperations = 0;
         this.neededDrainOperations = [];
         this.openServers = [];
         this.lockedServers = ["home"];
@@ -70,11 +71,16 @@ class ScriptManager {
 
             let targetServer = this.bestServer;
 
-            await this.performWeaken(availableThreads, targetServer);
-            if (await this.performGrow(availableThreads, targetServer)) {
+            try {
+                await this.performWeaken(availableThreads, targetServer);
+                await this.performGrow(availableThreads, targetServer)
                 await this.performWeaken(availableThreads, targetServer);
                 await this.performHack(availableThreads, targetServer);
+            } catch (e) {
+                this.ns.tprint(`A farming operation failed with ${e}. Waiting for ${formatSeconds(DRAIN_OPERATION_FAILED_WAIT_TIME)}`);
+                await this.ns.sleep(DRAIN_OPERATION_FAILED_WAIT_TIME);
             }
+
         }
     }
 
@@ -87,7 +93,7 @@ class ScriptManager {
             this.ns.tprint("Found that " + weakenNeeded + " weaken were needed for " + targetServer.name);
             await this.performLargeOperation(WEAKEN_SCRIPT_NAME, weakenNeeded, -1, targetServer.name);
             this.ns.tprint(`Sleeping for ${formatSeconds(estimatedWeakenTime)}`)
-            await this.ns.sleep(estimatedWeakenTime * 1000);
+            await this.ns.sleep((estimatedWeakenTime + 1) * 1000);
         }
         this.ns.tprint("Weaken resulted in a security level of: " + this.ns.getServerSecurityLevel(targetServer.name) + " with minimum: " + targetServer.server.minDifficulty);
     }
@@ -98,29 +104,24 @@ class ScriptManager {
 
         let estimatedGrowTime = Formulas.calculateGrowTime(targetServer.server, this.ns.getPlayer(), this.ns.getServerSecurityLevel(targetServer.name));
         this.ns.tprint(`Found that ${growThreads} grows were needed for ${targetServer.name}. Current balance is ${preGrowBalance} with max ${targetServer.server.moneyMax}`)
-        if (growThreads > availableThreads.growThreads) {
-            if (availableThreads.growThreads > 0) {
-                this.ns.tprint("Throttled down to " + availableThreads.growThreads + " grows that are needed for " + targetServer.name);
-                await this.performParallelOperations(GROW_SCRIPT_NAME, availableThreads.growThreads, GROW_RESULT_PORT, targetServer);
 
-                this.ns.tprint(`Sleeping for ${formatSeconds(estimatedGrowTime)}`)
-                await this.ns.sleep(estimatedGrowTime * 1000);
-
-                this.ns.tprint(`Balance was \$${preGrowBalance} before the grow and \$${this.ns.getServerMoneyAvailable(targetServer.name)} after the grow. (Max: ${targetServer.server.moneyMax})`);
-                this.ns.tprint("Skipping hack due to server not being fully grown");
+        if (growThreads > 0) {
+            let exceptionMessage = null;
+            try {
+                await this.performParallelOperations(GROW_SCRIPT_NAME, growThreads, GROW_RESULT_PORT, targetServer.name);
+            } catch (e) {
+                this.ns.tprint(e);
+                exceptionMessage = e;
             }
-            return false;
-        } else {
-            if (growThreads > 0) {
-                await this.performParallelOperations(GROW_SCRIPT_NAME, growThreads, GROW_RESULT_PORT, targetServer);
 
-                this.ns.tprint(`Sleeping for ${formatSeconds(estimatedGrowTime)}`)
-                await this.ns.sleep(estimatedGrowTime * 1000);
+            this.ns.tprint(`Sleeping for ${formatSeconds(estimatedGrowTime)}`)
+            await this.ns.sleep(estimatedGrowTime * 1000);
 
-                this.ns.tprint(`Balance was \$${preGrowBalance} before the grow and \$${this.ns.getServerMoneyAvailable(targetServer.name)} after the grow. (Max: ${targetServer.server.moneyMax})`);
+            this.ns.tprint(`Balance was \$${preGrowBalance} before the grow and \$${this.ns.getServerMoneyAvailable(targetServer.name)} after the grow. (Max: ${targetServer.server.moneyMax})`);
+
+            if (exceptionMessage !== null) {
+                throw exceptionMessage;
             }
-            return true
-
         }
     }
 
@@ -134,7 +135,7 @@ class ScriptManager {
             hackThreads = maxHack;
         }
 
-        if(hackThreads > 0) {
+        if (hackThreads > 0) {
             this.ns.tprint("Starting " + hackThreads + " hack threads for " + targetServer.name)
 
             const preHackBalance = this.ns.getServerMoneyAvailable(targetServer.name);
@@ -260,7 +261,7 @@ class ScriptManager {
         // Check if player unlocked new port hack option.
         const hackOptionsBefore = this.hacker.hackOptions.length;
         this.hacker.refreshHackOptions();
-        if(hackOptionsBefore !== this.hacker.hackOptions.length) {
+        if (hackOptionsBefore !== this.hacker.hackOptions.length) {
             updatedHackCapacity = true;
         }
 
@@ -308,12 +309,12 @@ class ScriptManager {
 
         const ramNeeded = threads * this.ns.getScriptRam(scriptName);
         let scriptStarted = false;
-        for(let server of usableServers) {
-            if(server.server.maxRam - this.ns.getServerUsedRam(server.name) > ramNeeded) {
+        for (let server of usableServers) {
+            if (server.server.maxRam - this.ns.getServerUsedRam(server.name) > ramNeeded) {
                 let processID = await this.ns.exec(scriptName, server.name, threads, target, port, "home", threads, Math.random());
 
                 if (processID === 0) {
-                    throw "Failed to create " + scriptName + " for " + target;
+                    throw `Failed to run ${scriptName} with ${threads} on target ${target}. Failed exec`
                 }
 
                 scriptStarted = true;
@@ -321,8 +322,8 @@ class ScriptManager {
             }
         }
 
-        if(!scriptStarted) {
-            this.ns.tprint(`Failed to run ${scriptName} with ${threads} on target ${target}`);
+        if (!scriptStarted) {
+            throw `Failed to run ${scriptName} with ${threads} on target ${target}. No available servers`
         }
 
         return new Date();
@@ -348,15 +349,19 @@ class ScriptManager {
 
                 // Last two arguments are passed because you cannot run the same script with same arguments on the same server.
                 // The last two arguments fix this by providing arbitrary values
-                let processID = await this.ns.exec(scriptName, server.name, 1, targetServer.name, scriptPort, server.name, activeThreads, "A");
+                let processID = await this.ns.exec(scriptName, server.name, 1, targetServer, scriptPort, server.name, activeThreads, "A");
 
                 if (processID === 0) {
-                    throw "Failed to create " + scriptName + " for " + targetServer.name
+                    throw `Failed to run ${scriptName} with ${numOfOperations} on target ${targetServer}. Failed exec`
                 }
                 // If scripts finish at the same time then it defeats the purpose of separate scripts. This sleep ensures that doesn't happen
                 await this.ns.sleep(1);
                 activeThreads++;
             }
+        }
+
+        if (activeThreads < numOfOperations) {
+            throw `Failed to run ${scriptName} with ${numOfOperations} on target ${targetServer}. Not enough servers`
         }
 
         return new Date();
@@ -367,12 +372,12 @@ class ScriptManager {
         let growThreads = 0;
 
         for (let server of this.openServers.concat(this.rootedServers)) {
-            if(server.server.maxRam > 0) {
+            if (server.server.maxRam > 0) {
                 const usedRam = this.ns.getServerUsedRam(server.name);
                 const serverRam = server.server.maxRam - usedRam;
                 if (server.name === "home") {
                     let homeRam = serverRam - this.args["home-reserve"];
-                    if(homeRam > 0) {
+                    if (homeRam > 0) {
                         hackThreads = Math.floor(homeRam / this.ns.getScriptRam(HACK_SCRIPT_NAME));
                         growThreads += Math.floor(homeRam / this.ns.getScriptRam(GROW_SCRIPT_NAME));
                     }
@@ -430,10 +435,12 @@ class ScriptManager {
             await this.ns.scp(DRAIN_HACK_SCRIPT_NAME, "home", server.name);
             await this.ns.scp(DRAIN_WEAKEN_SCRIPT_NAME, "home", server.name);
 
-            if(this.args["kill-existing"] === "yes") {
+            if (this.args["kill-existing"] === "yes") {
                 this.ns.scriptKill(GROW_SCRIPT_NAME, server.name);
                 this.ns.scriptKill(HACK_SCRIPT_NAME, server.name);
                 this.ns.scriptKill(WEAKEN_SCRIPT_NAME, server.name);
+                this.ns.scriptKill(DRAIN_WEAKEN_SCRIPT_NAME, server.name);
+                this.ns.scriptKill(DRAIN_HACK_SCRIPT_NAME, server.name);
             }
         }
         // For some reason executing a script quickly after a SCP results in an error. This sleep prevents such error
@@ -448,10 +455,10 @@ function formatSeconds(seconds) {
     seconds -= minutes * 60;
 
     let string = "";
-    if(hours > 0) {
+    if (hours > 0) {
         string += `${hours} hours `;
     }
-    if(minutes > 0) {
+    if (minutes > 0) {
         string += `${minutes} minutes `;
     }
 
