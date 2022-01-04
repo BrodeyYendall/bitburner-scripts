@@ -70,13 +70,9 @@ class ScriptManager {
 
             let targetServer = this.bestServer;
 
-            this.ns.tprint("here 1");
             await this.performWeaken(availableThreads, targetServer);
-            this.ns.tprint("here 2");
             if (await this.performGrow(availableThreads, targetServer)) {
-                this.ns.tprint("here 3");
                 await this.performWeaken(availableThreads, targetServer);
-                this.ns.tprint("here 4");
                 await this.performHack(availableThreads, targetServer);
             }
         }
@@ -105,7 +101,7 @@ class ScriptManager {
         if (growThreads > availableThreads.growThreads) {
             if (availableThreads.growThreads > 0) {
                 this.ns.tprint("Throttled down to " + availableThreads.growThreads + " grows that are needed for " + targetServer.name);
-                await this.performParallelOperations(GROW_SCRIPT_NAME, availableThreads.growThreads, GROW_RESULT_PORT, targetServer.server);
+                await this.performParallelOperations(GROW_SCRIPT_NAME, availableThreads.growThreads, GROW_RESULT_PORT, targetServer);
 
                 this.ns.tprint(`Sleeping for ${formatSeconds(estimatedGrowTime)}`)
                 await this.ns.sleep(estimatedGrowTime * 1000);
@@ -208,7 +204,6 @@ class ScriptManager {
                     this.ns.tprint(`Starting drain weaken on ${operation.server} with ${operation.weakenNeeded} threads.`);
                     await this.performLargeOperation(DRAIN_WEAKEN_SCRIPT_NAME, operation.weakenNeeded, DRAIN_WEAKEN_RESULT_PORT, operation.server);
                     operation.weakenNeeded = 0;
-                    this.activateDrainOperations++;
                 } catch (e) {
                     // no server available. Ignore the error because it will loop again
                 }
@@ -218,42 +213,33 @@ class ScriptManager {
                     this.ns.tprint(`Starting drain hack on ${operation.server} with ${operation.hackNeeded} threads.`);
                     await this.performLargeOperation(DRAIN_HACK_SCRIPT_NAME, operation.hackNeeded, DRAIN_HACK_RESULT_PORT, operation.server);
                     operation.hackNeeded = 0;
-                    this.activateDrainOperations++;
                 } catch (e) {
                     // no server available. Ignore the error because it will loop again
                 }
             }
         }
 
-        if(this.activateDrainOperations > 0) {
-            let portResult = await this.ns.readPort(DRAIN_WEAKEN_RESULT_PORT);
-            while (portResult !== "NULL PORT DATA") {
-                this.activateDrainOperations--;
-                let foundOperation = this.neededDrainOperations.find(operation => operation.server === portResult.target);
-                if(typeof(foundOperation) !== "undefined") {
-                    foundOperation.waitOnWeaken = false;
-                }
-                this.ns.tprint(`Completed drain weaken on ${portResult.target} with ${portResult.identifier} threads. Active operations: ${this.activateDrainOperations}`);
-                portResult = await this.ns.readPort(DRAIN_WEAKEN_RESULT_PORT);
+        let portResult = await this.ns.readPort(DRAIN_WEAKEN_RESULT_PORT);
+        while (portResult !== "NULL PORT DATA") {
+            let foundOperation = this.neededDrainOperations.find(operation => operation.server === portResult.target);
+            if(typeof(foundOperation) !== "undefined") {
+                foundOperation.waitOnWeaken = false;
             }
+            this.ns.tprint(`Completed drain weaken on ${portResult.target} with ${portResult.identifier} threads.`);
+            portResult = await this.ns.readPort(DRAIN_WEAKEN_RESULT_PORT);
+        }
 
+        portResult = await this.ns.readPort(DRAIN_HACK_RESULT_PORT);
+        while (portResult !== "NULL PORT DATA") {
+            if(portResult.result === 0) {
+                this.ns.tprint(`Restarted drain hack on ${portResult.target} with ${portResult.identifier} threads.`);
+                await this.performLargeOperation(DRAIN_HACK_SCRIPT_NAME, portResult.identifier, HACK_RESULT_PORT, portResult.target, portResult.target);
+            } else {
+                let indexOfOperation = this.neededDrainOperations.findIndex(operation => operation.server === portResult.target);
+                this.neededDrainOperations.splice(indexOfOperation, 1);
+                this.ns.tprint(`Completed drain hack on ${portResult.target} with ${portResult.identifier} threads earning ${portResult.result}.`);
+            }
             portResult = await this.ns.readPort(DRAIN_HACK_RESULT_PORT);
-            while (portResult !== "NULL PORT DATA") {
-                if(portResult.result === 0) {
-                    this.ns.tprint(`Restarted drain hack on ${portResult.target} with ${portResult.identifier} threads. Active operations: ${this.activateDrainOperations}`);
-                    await this.performLargeOperation(DRAIN_HACK_SCRIPT_NAME, portResult.identifier, HACK_RESULT_PORT, portResult.target, portResult.target);
-                } else {
-                    let indexOfOperation = this.neededDrainOperations.findIndex(operation => operation.server === portResult.target);
-                    this.neededDrainOperations.splice(indexOfOperation, 1);
-                    this.activateDrainOperations--;
-                    this.ns.tprint(`Completed drain hack on ${portResult.target} with ${portResult.identifier} threads earning ${portResult.result}. Active operations: ${this.activateDrainOperations}`);
-                }
-                portResult = await this.ns.readPort(DRAIN_HACK_RESULT_PORT);
-            }
-
-            if(this.activateDrainOperations < 0) {
-                this.activateDrainOperations = 0;
-            }
         }
 
     }

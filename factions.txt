@@ -1,11 +1,8 @@
-Faction Completed:
-    The Black Hand
-
 # Faction To Complete:
 ## Early Game
     Netburners
 ## City
-    New Tokyo
+    New Tokyo -- Think this is done
     Ishima
     Aevum -- Fairly sure this is done
     Volhaven
