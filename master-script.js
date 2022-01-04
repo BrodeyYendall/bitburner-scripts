@@ -153,19 +153,19 @@ class ScriptManager {
         let drainableServers = this.openServers.filter((server) => server.server.moneyAvailable > 0);
 
         let beginnerServers = drainableServers.filter(server => server.server.requiredHackingSkill < 100);
-        if(beginnerServers.length === 0) {
+        if (beginnerServers.length === 0) {
             drainableServers = drainableServers.slice(drainCutoff);
         } else {
             // Set drainableServers to all servers with hacking level < 100 except for the best server (which will be farmed).
             drainableServers = beginnerServers;
             let bestServerIndex = beginnerServers.indexOf(this.bestServer);
-            if(bestServerIndex !== -1) {
+            if (bestServerIndex !== -1) {
                 drainableServers.splice(bestServerIndex, 1);
             }
         }
 
         // Remove servers which already have their operations determined
-        drainableServers = drainableServers.filter(server => typeof(this.neededDrainOperations.find(operation => operation.server === server.name)) === "undefined");
+        drainableServers = drainableServers.filter(server => typeof (this.neededDrainOperations.find(operation => operation.server === server.name)) === "undefined");
 
         if (drainableServers.length === 0) {
             return;
@@ -187,21 +187,28 @@ class ScriptManager {
             const serverBalance = this.ns.getServerMoneyAvailable(server.name);
             const hackedNeeded = Math.min(Math.ceil(serverBalance / Math.floor(serverBalance * percentHacked)), availableThreads.hackThreads);
 
+            const weakenTime = Formulas.calculateWeakenTime(server.server, player, this.ns.getServerSecurityLevel(server.name));
+            const hackTime = Formulas.calculateHackingTime(server.server, player);
+
             this.neededDrainOperations.push({
                 server: server.name,
                 hackNeeded: hackedNeeded,
                 weakenNeeded: weakenNeeded,
-                waitOnWeaken: waitOnWeaken
+                waitOnWeaken: waitOnWeaken,
+                weakenTime: weakenTime,
+                hackTime: hackTime,
+                totalTime: weakenTime + hackTime
             });
         }
 
-        this.ns.tprint(this.neededDrainOperations);
+        // So that faster drains are completed first. Increases the amount of early income in a wipe
+        this.neededDrainOperations.sort((a, b) => a.totalTime - b.totalTime);
 
         for (let i = 0; i < this.neededDrainOperations.length; i++) {
             let operation = this.neededDrainOperations[i];
             if (operation.weakenNeeded > 0) {
                 try {
-                    this.ns.tprint(`Starting drain weaken on ${operation.server} with ${operation.weakenNeeded} threads.`);
+                    this.ns.tprint(`Starting drain weaken on ${operation.server} with ${operation.weakenNeeded} threads. It will take ${formatSeconds(operation.weakenTime)}`);
                     await this.performLargeOperation(DRAIN_WEAKEN_SCRIPT_NAME, operation.weakenNeeded, DRAIN_WEAKEN_RESULT_PORT, operation.server);
                     operation.weakenNeeded = 0;
                 } catch (e) {
@@ -210,7 +217,7 @@ class ScriptManager {
             }
             if (!operation.waitOnWeaken && operation.hackNeeded > 0) {
                 try {
-                    this.ns.tprint(`Starting drain hack on ${operation.server} with ${operation.hackNeeded} threads.`);
+                    this.ns.tprint(`Starting drain hack on ${operation.server} with ${operation.hackNeeded} threads. It will take ${formatSeconds(operation.hackTime)}`);
                     await this.performLargeOperation(DRAIN_HACK_SCRIPT_NAME, operation.hackNeeded, DRAIN_HACK_RESULT_PORT, operation.server);
                     operation.hackNeeded = 0;
                 } catch (e) {
@@ -222,8 +229,10 @@ class ScriptManager {
         let portResult = await this.ns.readPort(DRAIN_WEAKEN_RESULT_PORT);
         while (portResult !== "NULL PORT DATA") {
             let foundOperation = this.neededDrainOperations.find(operation => operation.server === portResult.target);
-            if(typeof(foundOperation) !== "undefined") {
+            if (typeof (foundOperation) !== "undefined") {
                 foundOperation.waitOnWeaken = false;
+                foundOperation.totalTime -= foundOperation.weakenTime;
+                foundOperation.weakenTime = 0;
             }
             this.ns.tprint(`Completed drain weaken on ${portResult.target} with ${portResult.identifier} threads.`);
             portResult = await this.ns.readPort(DRAIN_WEAKEN_RESULT_PORT);
@@ -231,7 +240,7 @@ class ScriptManager {
 
         portResult = await this.ns.readPort(DRAIN_HACK_RESULT_PORT);
         while (portResult !== "NULL PORT DATA") {
-            if(portResult.result === 0) {
+            if (portResult.result === 0) {
                 this.ns.tprint(`Restarted drain hack on ${portResult.target} with ${portResult.identifier} threads.`);
                 await this.performLargeOperation(DRAIN_HACK_SCRIPT_NAME, portResult.identifier, HACK_RESULT_PORT, portResult.target, portResult.target);
             } else {
