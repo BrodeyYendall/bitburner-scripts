@@ -11,7 +11,7 @@ const WEAKEN_SCRIPT_NAME = "weaken.js";
 const DRAIN_HACK_SCRIPT_NAME = "drain-hack.js";
 const DRAIN_WEAKEN_SCRIPT_NAME = "drain-weaken.js";
 
-const DRAIN_OPERATION_FAILED_WAIT_TIME = 10000;
+const DRAIN_OPERATION_FAILED_WAIT_TIME = 60000;
 
 
 import * as Formulas from "editted-formula.js"
@@ -77,7 +77,7 @@ class ScriptManager {
                 await this.performWeaken(availableThreads, targetServer);
                 await this.performHack(availableThreads, targetServer);
             } catch (e) {
-                this.ns.tprint(`A farming operation failed with ${e}. Waiting for ${formatSeconds(DRAIN_OPERATION_FAILED_WAIT_TIME)}`);
+                this.ns.tprint(`A farming operation failed with ${e}. Waiting for ${formatSeconds(DRAIN_OPERATION_FAILED_WAIT_TIME / 1000)}`);
                 await this.ns.sleep(DRAIN_OPERATION_FAILED_WAIT_TIME);
             }
 
@@ -354,8 +354,8 @@ class ScriptManager {
                 if (processID === 0) {
                     throw `Failed to run ${scriptName} with ${numOfOperations} on target ${targetServer}. Failed exec`
                 }
-                // If scripts finish at the same time then it defeats the purpose of separate scripts. This sleep ensures that doesn't happen
-                await this.ns.sleep(1);
+
+                await this.ns.sleep(1); // Without this sleep I get an "no main function" error.(Game bug)
                 activeThreads++;
             }
         }
