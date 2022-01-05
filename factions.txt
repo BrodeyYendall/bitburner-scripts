@@ -5,13 +5,11 @@
     New Tokyo -- Think this is done
     Ishima -- Didn't complete but its just a combat augment
     Aevum -- Fairly sure this is done
-    Volhaven
 ## MegaCorp
-    MegaCorp
     Blade Industries
     KuaiGong International
     NWO
-    OmniTek Incorporated -- Combat Augments with one hacking augment
+    OmniTek Incorporated -- Only hacking augment left
     ECorp
     Bachman & Associates
     Clarke Incorporated
