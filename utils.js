@@ -24,7 +24,8 @@ export function findServer(ns, args) {
     }
     let search = ServerScan.breathFirstScan(ns);
 
-    let searchedServer = search.toVisit.find(node => node.name === args["values"]);
+    const serverToFind = args["values"].toLowerCase();
+    let searchedServer = search.toVisit.find(node => node.name.toLowerCase() === serverToFind);
 
     if (typeof (searchedServer) === "undefined") {
         ns.tprint("Failed to find server " + args["values"]);
