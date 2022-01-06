@@ -99,7 +99,9 @@ class ScriptManager {
                     await this.performWeaken(targetServer);
                 }
                 await this.performGrow(targetServer);
-                await this.performWeaken(targetServer);
+                if(this.ns.getServerSecurityLevel(targetServer.name) - targetServer.server.minDifficulty > 10) {
+                    await this.performWeaken(targetServer);
+                }
                 await this.performHack(targetServer);
             } catch (e) {
                 this.ns.tprint(typeof (e));
@@ -220,7 +222,7 @@ class ScriptManager {
 
             // noinspection JSIncompatibleTypesComparison
             if(threadObject === null) {
-                threadObject = this.threadManager.individualThreads(maxHack, true);
+                threadObject = this.threadManager.peekIndividualThreads(maxHack, true);
                 this.ns.tprint(`Hack: Not a big enough machine for ${maxHack} threads. Using ${threadObject.reduce((total, object) => total + object.threads, 0)} individual threads instead.`);
                 await this.performParallelOperations(HACK_SCRIPT_NAME, targetServer.name, estimatedHackTime, threadObject);
                 failedToFullHack = true;
@@ -622,11 +624,9 @@ class ThreadManager {
     }
 
     freeIndividualThreads(serversToFree) {
-        this.ns.tprint(Array.from(this.bulkThreads.entries()));
         for (let server of serversToFree) {
             this.freeBulkThreads(server);
         }
-        this.ns.tprint(Array.from(this.bulkThreads.entries()));
     }
 
     print() {
@@ -648,14 +648,21 @@ class ThreadManager {
     #freeQueuedThreads() {
         if(this.freeThreadQueue.length > 0) {
             const currentDateTime = new Date();
-            if (this.freeThreadQueue[0].timeToFree <= currentDateTime) {
-                let serverToFree = this.freeThreadQueue.shift();
-                if (serverToFree.isBulk) {
-                    this.freeBulkThreads(serverToFree.servers);
+            for(let i = 0; i < this.freeThreadQueue.length; i++) {
+                if (this.freeThreadQueue[0].timeToFree <= currentDateTime) {
+                    let serverToFree = this.freeThreadQueue.shift();
+                    if (serverToFree.isBulk) {
+                        this.freeBulkThreads(serverToFree.servers);
+                    } else {
+                        this.freeIndividualThreads(serverToFree.servers);
+                    }
+
+                    i--;
                 } else {
-                    this.freeIndividualThreads(serverToFree.servers);
+                    break;
                 }
             }
+
         }
     }
 
