@@ -10,7 +10,7 @@ export async function main(ns) {
 
     const ram = args["ram"];
     let currentServers = [];
-    if(args["sell-old"] === "yes") {
+    if (args["sell-old"] === "yes") {
         currentServers = ns.getPurchasedServers();
 
         const preFilterLength = currentServers.length;
@@ -19,13 +19,13 @@ export async function main(ns) {
         serversToBuy -= preFilterLength - currentServers.length;
     }
 
-    const serverCost =  ns.getPurchasedServerCost(ram);
+    const serverCost = ns.getPurchasedServerCost(ram);
     ns.tprint(`Server with ${ram}GB costs \$${serverCost}`);
 
     let serversBought = 0;
-    while(serversToBuy > 0) {
+    while (serversToBuy > 0) {
         if (ns.getServerMoneyAvailable("home") > serverCost) {
-            if(currentServers.length > 0) {
+            if (currentServers.length > 0) {
                 ns.deleteServer(currentServers[0]);
                 currentServers = currentServers.slice(1);
             }

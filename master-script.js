@@ -95,11 +95,11 @@ class ScriptManager {
 
                 this.ns.tprint(`Estimating, h: ${hackNeeded}, hw: ${postHackWeakenNeeded}, g: ${growNeeded}, gw: ${postGrowWeakenNeeded}`);
 
-                if(this.ns.getServerSecurityLevel(targetServer.name) - targetServer.server.minDifficulty > 10) {
+                if(this.ns.getServerSecurityLevel(targetServer.name) - targetServer.server.minDifficulty > 5) {
                     await this.performWeaken(targetServer);
                 }
                 await this.performGrow(targetServer);
-                if(this.ns.getServerSecurityLevel(targetServer.name) - targetServer.server.minDifficulty > 10) {
+                if(this.ns.getServerSecurityLevel(targetServer.name) - targetServer.server.minDifficulty > 5) {
                     await this.performWeaken(targetServer);
                 }
                 await this.performHack(targetServer);
@@ -182,7 +182,7 @@ class ScriptManager {
                 if(threadObject.length === 0) {
                     threadObject = this.threadManager.peekIndividualThreads(growThreads, true);
                     failedToFullGrow = true;
-                    this.ns.tprint(`Grow: Not a big enough machine for ${growThreads} threads. Using ${threadObject.reduce((total, object) => total + object.threads, 0)} individual threads instead.`);
+                    this.ns.tprint(`Grow: Not enough machines for ${growThreads} threads. Using ${threadObject.reduce((total, object) => total + object.threads, 0)} threads instead.`);
                 }
 
                 await this.performParallelOperations(GROW_SCRIPT_NAME, targetServer.name, estimatedGrowTime, threadObject);
@@ -415,7 +415,7 @@ class ScriptManager {
         let processID = await this.ns.exec(scriptName, threadObject.server, threadObject.threads, target, port, "home", threadObject.threads, Math.random());
 
         if (processID === 0) {
-            throw `Failed to run ${scriptName} with ${threadObject.threads} on target ${target}. Failed exec`
+            throw new Error(`Failed to run ${scriptName} with ${threadObject.threads} on target ${target}. Failed exec`) // Use error object so it isn't just caught and printed
         }
 
         let finishDateTime = new Date();
@@ -438,7 +438,7 @@ class ScriptManager {
                     finishDateTime.setSeconds(finishDateTime.getSeconds() + estimatedTime);
                     this.threadManager.commitIndividualThreads(threadObject, finishDateTime);
 
-                    throw `Failed to run ${scriptName} on target ${target}. Failed exec`
+                    throw new Error(`Failed to run ${scriptName} on target ${target}. Failed exec`); // Use error object so it isn't just caught and printed
                 }
 
                 await this.ns.sleep(1);
@@ -539,16 +539,22 @@ class ThreadManager {
 
     addNewServers(newServers) {
         for (let server of newServers) {
-            let availableRam = server.server.maxRam - this.ns.getServerUsedRam(server.name);
-            if (server.name === "home") {
-                availableRam -= this.args["home-reserve"];
+            // If server doesn't already exist
+            if(typeof(this.bulkThreads.get(server.name)) === "undefined") {
+                let availableRam = server.server.maxRam - this.ns.getServerUsedRam(server.name);
+                if (server.name === "home") {
+                    availableRam -= this.args["home-reserve"];
+                }
+                const availableThreads = Math.floor(availableRam / WORKER_SCRIPT_SIZE);
+                if (availableThreads > 0) {
+                    this.bulkThreads.set(server.name, availableThreads);
+                    this.individualThreads += availableThreads;
+                }
             }
-            const availableThreads = Math.floor(availableRam / WORKER_SCRIPT_SIZE);
-            if (availableThreads > 0) {
-                this.bulkThreads.set(server.name, availableThreads);
-                this.individualThreads += availableThreads;
-            }
+
         }
+
+        this.ns.tprint(`Home: ${this.bulkThreads.get("home")}`);
     }
 
     peekBulkThreads(threads, scaleToPossible = false) {
@@ -637,7 +643,9 @@ class ThreadManager {
     #getUsableServers() {
         this.#freeQueuedThreads();
         let possibleServers = Array.from(this.bulkThreads.entries());
+
         possibleServers = possibleServers.filter(a => a[1] > 0);
+
         possibleServers.sort((a, b) => a[1] - b[1]);
 
 
@@ -665,5 +673,6 @@ class ThreadManager {
 
         }
     }
+
 
 }
