@@ -36,8 +36,8 @@ export function neededGrowthServers(ns, server, growAmount = 0, isPerformanceInd
         }
 
         if (cores >= CORE_CUTOFF) {
-            ns.tprint("*** Possible error, reached max grow estimation. Server balance might be so low its impractical to grow or actually need this many grows");
-            throw "Possible error, reached max grow estimation. Server balance might be so low its impractical to grow or actually need this many grows";
+            ns.tprint("*** Possible error, reached max grow estimation. Server balance might be so low its impractical to grow or actually need this many grows. Current balance: " + currentBalance);
+            throw "Possible error, reached max grow estimation. Server balance might be so low its impractical to grow or actually need this many grows. Current balance: " + currentBalance;
         }
     }
 
@@ -84,7 +84,8 @@ export function determineMaxHack(ns, server, growServers, isPerformanceIndicator
     if (percentageHacked <= 0) {
         return {
             hackCores: 0,
-            amountHacked: 0
+            amountHacked: 0,
+            growThreads: 0
         }
     }
     // topBalance - (Math.floor(topBalance * percentHacked) * x) = lowBalance
@@ -96,7 +97,8 @@ export function determineMaxHack(ns, server, growServers, isPerformanceIndicator
 
     return {
         hackCores: hackCores,
-        amountHacked: amountHacked
+        amountHacked: amountHacked,
+        growThreads: (i - 1)
     }
 }
 

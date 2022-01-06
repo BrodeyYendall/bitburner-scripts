@@ -13,7 +13,11 @@ const DRAIN_WEAKEN_SCRIPT_NAME = "drain-weaken.js";
 
 const WORKER_SCRIPT_SIZE = 1.75;
 
-const DRAIN_OPERATION_FAILED_WAIT_TIME = 60000;
+const DRAIN_OPERATION_FAILED_WAIT_TIME = 0; //60000;
+
+const GROW_SECURITY_IMPACT = 0.004;
+const HACK_SECURITY_IMPACT = 0.002;
+const WEAKEN_SECURITY_IMPACT = 0.05;
 
 
 import * as Formulas from "editted-formula.js"
@@ -28,7 +32,7 @@ export async function main(ns) {
         ["show-leaderboard", "yes"],
         ["leaderboard-cutoff", 10],
         ["home-reserve", 80],
-        ["kill-existing", "no"]
+        ["kill-existing", "yes"]
     ]);
 
     let scriptManager = new ScriptManager(ns, args);
@@ -72,14 +76,29 @@ class ScriptManager {
 
             let targetServer = this.bestServer;
 
-            // Temporary code for ensuring that threadManager is preforming correctly
-            const individualThreadsBefore = this.threadManager.individualThreads;
-            const bulkThreadsBefore = Array.from(this.threadManager.bulkThreads.entries());
+            // // Temporary code for ensuring that threadManager is preforming correctly
+            // const individualThreadsBefore = this.threadManager.individualThreads;
+            // const bulkThreadsBefore = Array.from(this.threadManager.bulkThreads.entries());
+            //
+            // // Prepare server before going into main loop
+            // await this.performWeaken(targetServer);
+            // await this.performGrow(targetServer)
 
 
             try {
-                await this.performWeaken(targetServer);
-                await this.performGrow(targetServer)
+                let maxHackResults = Formulas.determineMaxHack(this.ns, targetServer.server, this.threadManager.individualThreads, true);
+
+                let hackNeeded = Math.floor(maxHackResults.hackCores);
+                let postHackWeakenNeeded = Math.ceil((hackNeeded * HACK_SECURITY_IMPACT) / WEAKEN_SECURITY_IMPACT);
+                let growNeeded = maxHackResults.growThreads;
+                let postGrowWeakenNeeded = Math.ceil((growNeeded * GROW_SECURITY_IMPACT) / WEAKEN_SECURITY_IMPACT);
+
+                this.ns.tprint(`Estimating, h: ${hackNeeded}, hw: ${postHackWeakenNeeded}, g: ${growNeeded}, gw: ${postGrowWeakenNeeded}`);
+
+                if(this.ns.getServerSecurityLevel(targetServer.name) - targetServer.server.minDifficulty > 10) {
+                    await this.performWeaken(targetServer);
+                }
+                await this.performGrow(targetServer);
                 await this.performWeaken(targetServer);
                 await this.performHack(targetServer);
             } catch (e) {
@@ -93,23 +112,25 @@ class ScriptManager {
 
             }
 
-            // Temporary code for ensuring that threadManager is preforming correctly
-            this.threadManager.peekBulkThreads(1);
+            await this.ns.sleep(5000);
 
-            const individualThreadsAfter = this.threadManager.individualThreads;
-            // A farming operation failed with Individual before and after not equal, before: 385544, after: 383654. Waiting for 1 minutes 0 seconds
-            if(individualThreadsBefore !== individualThreadsAfter) {
-                throw `Individual before and after not equal, before: ${individualThreadsBefore}, after: ${individualThreadsAfter}`;
-            }
-            const bulkThreadsAfter = Array.from(this.threadManager.bulkThreads.entries());
-            if(bulkThreadsBefore.length !== bulkThreadsAfter.length) {
-                throw `Bulk length before and after not equal, before: ${bulkThreadsBefore.length}, after: ${bulkThreadsAfter.length}`;
-            }
-            for(let i = 0; i < bulkThreadsAfter.length; i++) {
-                if(bulkThreadsBefore[i][0] !== bulkThreadsAfter[i][0] || bulkThreadsBefore[i][1] !== bulkThreadsAfter[i][1]) {
-                    throw `Bulk before and after not equal, before: ${bulkThreadsBefore[i]}, after: ${bulkThreadsAfter[i]}`;
-                }
-            }
+            // // Temporary code for ensuring that threadManager is preforming correctly
+            // this.threadManager.peekBulkThreads(1);
+            //
+            // const individualThreadsAfter = this.threadManager.individualThreads;
+            // // A farming operation failed with Individual before and after not equal, before: 385544, after: 383654. Waiting for 1 minutes 0 seconds
+            // if(individualThreadsBefore !== individualThreadsAfter) {
+            //     throw `Individual before and after not equal, before: ${individualThreadsBefore}, after: ${individualThreadsAfter}`;
+            // }
+            // const bulkThreadsAfter = Array.from(this.threadManager.bulkThreads.entries());
+            // if(bulkThreadsBefore.length !== bulkThreadsAfter.length) {
+            //     throw `Bulk length before and after not equal, before: ${bulkThreadsBefore.length}, after: ${bulkThreadsAfter.length}`;
+            // }
+            // for(let i = 0; i < bulkThreadsAfter.length; i++) {
+            //     if(bulkThreadsBefore[i][0] !== bulkThreadsAfter[i][0] || bulkThreadsBefore[i][1] !== bulkThreadsAfter[i][1]) {
+            //         throw `Bulk before and after not equal, before: ${bulkThreadsBefore[i]}, after: ${bulkThreadsAfter[i]}`;
+            //     }
+            // }
 
         }
     }
@@ -119,13 +140,26 @@ class ScriptManager {
 
         let estimatedWeakenTime = Formulas.calculateWeakenTime(targetServer.server, this.ns.getPlayer(), securityLevel);
         if (securityLevel > targetServer.server.minDifficulty) {
-            let weakenNeeded = Math.ceil((Math.ceil(securityLevel - targetServer.server.minDifficulty)) / 0.05);
-            this.ns.tprint("Found that " + weakenNeeded + " weaken were needed for " + targetServer.name);
+            let weakenNeeded = Math.ceil((securityLevel - targetServer.server.minDifficulty) / 0.05);
+            this.ns.tprint("Found that " + weakenNeeded + " weaken were needed for " + targetServer.name + " for security level " + securityLevel);
 
+            let failedToFullWeaken = false;
             let threadObject = this.threadManager.peekBulkThreads(weakenNeeded);
-            await this.performLargeOperation(WEAKEN_SCRIPT_NAME, -1, targetServer.name, estimatedWeakenTime, threadObject);
+            // noinspection JSIncompatibleTypesComparison
+            if(threadObject === null) {
+                failedToFullWeaken = false;
+                threadObject = this.threadManager.peekIndividualThreads(weakenNeeded, true);
+                this.ns.tprint(`Weaken: Not a big enough machine for ${weakenNeeded} threads. Using ${threadObject.reduce((total, object) => total + object.threads, 0)} individual threads instead.`);
+                await this.performParallelOperations(WEAKEN_SCRIPT_NAME, targetServer.name, estimatedWeakenTime, threadObject);
+            } else {
+                await this.performLargeOperation(WEAKEN_SCRIPT_NAME, -1, targetServer.name, estimatedWeakenTime, threadObject);
+            }
             this.ns.tprint(`Sleeping for ${formatSeconds(estimatedWeakenTime)}`)
             await this.ns.sleep((estimatedWeakenTime + 1) * 1000);
+
+            if(failedToFullWeaken) {
+                throw "Failed to full weaken";
+            }
         }
         this.ns.tprint("Weaken resulted in a security level of: " + this.ns.getServerSecurityLevel(targetServer.name) + " with minimum: " + targetServer.server.minDifficulty);
     }
@@ -139,8 +173,16 @@ class ScriptManager {
 
         if (growThreads > 0) {
             let exceptionMessage = null;
+
+            let failedToFullGrow = false;
             try {
                 let threadObject = this.threadManager.peekIndividualThreads(growThreads);
+                if(threadObject.length === 0) {
+                    threadObject = this.threadManager.peekIndividualThreads(growThreads, true);
+                    failedToFullGrow = true;
+                    this.ns.tprint(`Grow: Not a big enough machine for ${growThreads} threads. Using ${threadObject.reduce((total, object) => total + object.threads, 0)} individual threads instead.`);
+                }
+
                 await this.performParallelOperations(GROW_SCRIPT_NAME, targetServer.name, estimatedGrowTime, threadObject);
             } catch (e) {
                 this.ns.tprint(e);
@@ -151,6 +193,10 @@ class ScriptManager {
             await this.ns.sleep(estimatedGrowTime * 1000);
 
             this.ns.tprint(`Balance was \$${preGrowBalance} before the grow and \$${this.ns.getServerMoneyAvailable(targetServer.name)} after the grow. (Max: ${targetServer.server.moneyMax})`);
+
+            if(failedToFullGrow) {
+                throw "Failed to full grow";
+            }
 
             if (exceptionMessage !== null) {
                 throw exceptionMessage;
@@ -168,13 +214,30 @@ class ScriptManager {
 
             const preHackBalance = this.ns.getServerMoneyAvailable(targetServer.name);
 
+            let failedToFullHack = false;
+
             let threadObject = this.threadManager.peekBulkThreads(maxHack);
-            await this.performLargeOperation(HACK_SCRIPT_NAME, HACK_RESULT_PORT, targetServer.name, estimatedHackTime, threadObject);
+
+            // noinspection JSIncompatibleTypesComparison
+            if(threadObject === null) {
+                threadObject = this.threadManager.individualThreads(maxHack, true);
+                this.ns.tprint(`Hack: Not a big enough machine for ${maxHack} threads. Using ${threadObject.reduce((total, object) => total + object.threads, 0)} individual threads instead.`);
+                await this.performParallelOperations(HACK_SCRIPT_NAME, targetServer.name, estimatedHackTime, threadObject);
+                failedToFullHack = true;
+            } else {
+                await this.performLargeOperation(HACK_SCRIPT_NAME, HACK_RESULT_PORT, targetServer.name, estimatedHackTime, threadObject);
+
+            }
+
 
             this.ns.tprint(`Sleeping for ${formatSeconds(estimatedHackTime)}`)
             await this.ns.sleep(estimatedHackTime * 1000);
 
             this.ns.tprint(`Balance was \$${preHackBalance} before the hack and \$${this.ns.getServerMoneyAvailable(targetServer.name)} after the hack`);
+
+            if(failedToFullHack) {
+                throw "Failed to full hack";
+            }
 
         }
     }
@@ -355,6 +418,7 @@ class ScriptManager {
 
         let finishDateTime = new Date();
         finishDateTime.setSeconds(finishDateTime.getSeconds() + estimatedTime);
+
         this.threadManager.commitBulkThreads(threadObject, finishDateTime)
     }
 
@@ -413,7 +477,7 @@ class ScriptManager {
                     this.ns.tprint(`${this.openServers[i].name}: score: ${performance.score}, amount: ${performance.amountHacked},grow #: ${performance.numOfGrow}, hack #: ${performance.numOfHack}, weaken: ${performance.weakenTime}s, port: ${this.ns.getServerNumPortsRequired(this.openServers[i].name)}, level: ${this.ns.getServerRequiredHackingLevel(this.openServers[i].name)}`);
                 }
             }
-            if(i <= leaderBoardCutoff) {
+            if(this.openServers.length > leaderBoardCutoff) {
                 this.ns.tprint(`And ${this.openServers.length - leaderBoardCutoff} more servers...`);
             }
             this.ns.tprint("\n\n");
@@ -515,15 +579,13 @@ class ThreadManager {
             const possibleServers = this.#getUsableServers();
             for (let i = 0; i < possibleServers.length && threadsRemaining > 0; i++) {
                 let server = possibleServers[i];
-                if (server[1] > 0) {
-                    let threads = server[1];
-                    if (server[1] > threadsRemaining) {
-                        threads = threadsRemaining;
-                    }
-                    threadsRemaining -= threads;
-                    // noinspection JSCheckFunctionSignatures
-                    threadAllocations.push({server: server[0], threads: threads});
+                let threads = server[1];
+                if (server[1] > threadsRemaining) {
+                    threads = threadsRemaining;
                 }
+                threadsRemaining -= threads;
+                // noinspection JSCheckFunctionSignatures
+                threadAllocations.push({server: server[0], threads: threads});
             }
 
             if (threadsRemaining > 0 && !scaleToPossible) {
@@ -560,9 +622,11 @@ class ThreadManager {
     }
 
     freeIndividualThreads(serversToFree) {
+        this.ns.tprint(Array.from(this.bulkThreads.entries()));
         for (let server of serversToFree) {
             this.freeBulkThreads(server);
         }
+        this.ns.tprint(Array.from(this.bulkThreads.entries()));
     }
 
     print() {
@@ -573,7 +637,10 @@ class ThreadManager {
     #getUsableServers() {
         this.#freeQueuedThreads();
         let possibleServers = Array.from(this.bulkThreads.entries());
+        possibleServers = possibleServers.filter(a => a[1] > 0);
         possibleServers.sort((a, b) => a[1] - b[1]);
+
+
 
         return possibleServers;
     }
