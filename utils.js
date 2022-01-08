@@ -1,5 +1,6 @@
 import * as ServerScan from "ServerScan.js"
 
+// noinspection JSUnusedGlobalSymbols
 /** @param {NS} ns **/
 export async function main(ns) {
     const args = ns.flags([
@@ -12,13 +13,13 @@ export async function main(ns) {
             findServer(ns, args);
             break;
         case "test":
-            ns.tprint(ns.getPurchasedServers());
+            determineGrowthFunctions(ns);
             break;
     }
 }
 
 export function findServer(ns, args) {
-    if(args["values"] === null) {
+    if (args["values"] === null) {
         ns.tprint("No value received, please use the --values flag");
         return;
     }
@@ -43,3 +44,24 @@ export function findServer(ns, args) {
         ns.tprint(string);
     }
 }
+
+export function determineGrowthFunctions(ns) {
+    let search = ServerScan.breathFirstScan(ns);
+    let servers = search.openServers;
+
+    for (let server of servers) {
+        //Get adjusted growth rate, which accounts for server security
+        let adjGrowthRate = 1 + (1.03 - 1) / server.server.minDifficulty;
+        if (adjGrowthRate > 1.0035) {
+            adjGrowthRate = 1.0035;
+        }
+
+        const moneyAvailable = server.server.moneyMax * 0.5;
+
+        let individualThreadFormula = `${moneyAvailable} * (1 + (1.03 - 1) / a)^((b / 100) * x * c)`;
+        let bulkThreadFormula = `${moneyAvailable} * ((1 + (1.03 - 1) / a)^((b / 100) * c)) ^ x`;
+
+        ns.tprint(`${server.name}: ${individualThreadFormula} = ${bulkThreadFormula}`);
+    }
+}
+
