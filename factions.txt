@@ -1,16 +1,80 @@
 # Faction To Complete:
 ## Early Game
-    Netburners
+                    CyberSec:
+                        Hack CSEC manually
+                    Tian Di Hui: -- Amazing for rep farming but very little for hacking
+                        $1,000,000
+                        Hacking 50
+                        Be in Chongquin, New Tokyo, or Ishima
+    Netburners:
+        Total Hacknet levels 100
+        Hacking 80
+        Total Hacknet RAM 8
+        Total Hacknet Cores 4
+
 ## City
-    New Tokyo -- Think this is done
-    Ishima -- Didn't complete but its just a combat augment
-    Aevum -- Fairly sure this is done
+    Chongquin: - Hacking power and rep augments (Same rep as Tian Di Hui)
+        Be in Chongquin
+        $20,000,000
+        Not in city factions Sector-12, Aevum, or Volhaven
+    New Tokyo:
+        Be in New Tokyo
+        $20,000,000
+        Not in city factions Sector-12, Aevum, or Volhaven
+    Ishima:
+        Be in Ishima
+        $30,000,000
+        Not in city factions Sector-12, Aevum, or Volhaven
+    Aevum:
+        Be in Aevum
+        $40,000,000
+    Volhaven:
+        Be in Volhaven
+        $50,000,000
+        Not in any other city faction
+
+## Hacker Groups
+                NiteSec:
+                    Hack avmnite-02h manually
+                    Home RAM at least 32
+                The Black Hand:
+                    Hack I.I.I.I manually
+                    Home RAM of 64 GB
+    BitRunners:
+        Hack run4theh111z manually
+        Home RAM of 128 GB
+
+
 ## MegaCorp
-    Blade Industries
-    KuaiGong International
-    NWO
-    OmniTek Incorporated -- Only hacking augment left
-    ECorp
-    Bachman & Associates
-    Clarke Incorporated
-    Fulcrum Secret Technologies
+
+    MegaCorp:
+        Work for MegaCorp
+        At least 200,000 reputation
+    Blade Industries:
+        Work for Blade Industries
+        At least 200,000 reputation
+    Four Sigma:
+        Work for Four Sigma
+        At least 200,000 reputation
+    KuaiGong International:
+        Work for KuaiGong International
+        At least 200,000 reputation
+    NWO:
+        Work for NWO
+        At least 200,000 reputation
+    OmniTek Incorporated:
+        Work for OmniTek Incorporated
+        At least 200,000 reputation
+    ECorp:
+        Work for ECorp
+        At least 200,000 reputation
+    Bachman & Associates:
+        Work for Backman & Associates
+        At least 200,000 reputation
+    Clarke Incorporated:
+        Work for Clarke Incorporated
+        At least 200,000 reputation
+    Fulcrum Secret Technologies:
+        Work for Fulcrum Technologies
+        At least 200,000 reputation
+        Hack fulcrumassets manually

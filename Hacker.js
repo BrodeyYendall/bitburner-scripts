@@ -26,7 +26,7 @@ export class Hacker {
     hackServer(serverName) {
         let numPortsRequired = this.ns.getServerNumPortsRequired(serverName);
         if (this.hackOptions.length < numPortsRequired) {
-            this.ns.tprint(serverName + " needs " + numPortsRequired + " open ports");
+            this.ns.print(serverName + " needs " + numPortsRequired + " open ports");
             return false;
         }
 

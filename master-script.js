@@ -76,64 +76,47 @@ class ScriptManager {
 
             let targetServer = this.bestServer;
 
-            // // Temporary code for ensuring that threadManager is preforming correctly
-            // const individualThreadsBefore = this.threadManager.individualThreads;
-            // const bulkThreadsBefore = Array.from(this.threadManager.bulkThreads.entries());
-            //
-            // // Prepare server before going into main loop
-            // await this.performWeaken(targetServer);
-            // await this.performGrow(targetServer)
+            // If the target server is home then a mistake happened at some point. So that XP can still be gain, the script hacks home with all threads
+            if(targetServer.name === "home") {
+                let estimateHackTime = Formulas.calculateHackingTime(targetServer.server, this.ns.getPlayer(), this.ns.getServerSecurityLevel(targetServer.name));
+                let threadObject = this.threadManager.peekIndividualThreads(this.threadManager.individualThreads, true);
 
+                this.ns.tprint(`Target server is broken, targeting home with ${threadObject.reduce((total, object) => total + object.threads, 0)} hack threads instead`);
+                await this.performParallelOperations(WEAKEN_SCRIPT_NAME, targetServer.name, estimateHackTime, threadObject);
 
-            try {
-                let maxHackResults = Formulas.determineMaxHack(this.ns, targetServer.server, this.threadManager.individualThreads, true);
+                this.ns.tprint(`Sleeping for ${formatSeconds(estimateHackTime)}`)
+                await this.ns.sleep(estimateHackTime * 1000);
 
-                let hackNeeded = Math.floor(maxHackResults.hackCores);
-                let postHackWeakenNeeded = Math.ceil((hackNeeded * HACK_SECURITY_IMPACT) / WEAKEN_SECURITY_IMPACT);
-                let growNeeded = maxHackResults.growThreads;
-                let postGrowWeakenNeeded = Math.ceil((growNeeded * GROW_SECURITY_IMPACT) / WEAKEN_SECURITY_IMPACT);
+            } else {
+                try {
+                    let maxHackResults = Formulas.determineMaxHack(this.ns, targetServer.server, this.threadManager.individualThreads, true);
 
-                this.ns.tprint(`Estimating, h: ${hackNeeded}, hw: ${postHackWeakenNeeded}, g: ${growNeeded}, gw: ${postGrowWeakenNeeded}`);
+                    let hackNeeded = Math.floor(maxHackResults.hackCores);
+                    let postHackWeakenNeeded = Math.ceil((hackNeeded * HACK_SECURITY_IMPACT) / WEAKEN_SECURITY_IMPACT);
+                    let growNeeded = maxHackResults.growThreads;
+                    let postGrowWeakenNeeded = Math.ceil((growNeeded * GROW_SECURITY_IMPACT) / WEAKEN_SECURITY_IMPACT);
 
-                if(this.ns.getServerSecurityLevel(targetServer.name) - targetServer.server.minDifficulty > 5) {
-                    await this.performWeaken(targetServer);
+                    this.ns.tprint(`Estimating, h: ${hackNeeded}, hw: ${postHackWeakenNeeded}, g: ${growNeeded}, gw: ${postGrowWeakenNeeded}`);
+
+                    if(this.ns.getServerSecurityLevel(targetServer.name) - targetServer.server.minDifficulty > 5) {
+                        await this.performWeaken(targetServer);
+                    }
+                    await this.performGrow(targetServer);
+                    if(this.ns.getServerSecurityLevel(targetServer.name) - targetServer.server.minDifficulty > 5) {
+                        await this.performWeaken(targetServer);
+                    }
+                    await this.performHack(targetServer);
+                } catch (e) {
+                    this.ns.tprint(typeof (e));
+                    if (typeof (e) === "object") {
+                        throw e; // If it is not a string then I did not throw it; It is an error in my code.
+                    } else {
+                        this.ns.tprint(`A farming operation failed with ${e}. Waiting for ${formatSeconds(DRAIN_OPERATION_FAILED_WAIT_TIME / 1000)}`);
+                        await this.ns.sleep(DRAIN_OPERATION_FAILED_WAIT_TIME);
+                    }
+
                 }
-                await this.performGrow(targetServer);
-                if(this.ns.getServerSecurityLevel(targetServer.name) - targetServer.server.minDifficulty > 5) {
-                    await this.performWeaken(targetServer);
-                }
-                await this.performHack(targetServer);
-            } catch (e) {
-                this.ns.tprint(typeof (e));
-                if (typeof (e) === "object") {
-                    throw e; // If it is not a string then I did not throw it; It is an error in my code.
-                } else {
-                    this.ns.tprint(`A farming operation failed with ${e}. Waiting for ${formatSeconds(DRAIN_OPERATION_FAILED_WAIT_TIME / 1000)}`);
-                    await this.ns.sleep(DRAIN_OPERATION_FAILED_WAIT_TIME);
-                }
-
             }
-
-            await this.ns.sleep(5000);
-
-            // // Temporary code for ensuring that threadManager is preforming correctly
-            // this.threadManager.peekBulkThreads(1);
-            //
-            // const individualThreadsAfter = this.threadManager.individualThreads;
-            // // A farming operation failed with Individual before and after not equal, before: 385544, after: 383654. Waiting for 1 minutes 0 seconds
-            // if(individualThreadsBefore !== individualThreadsAfter) {
-            //     throw `Individual before and after not equal, before: ${individualThreadsBefore}, after: ${individualThreadsAfter}`;
-            // }
-            // const bulkThreadsAfter = Array.from(this.threadManager.bulkThreads.entries());
-            // if(bulkThreadsBefore.length !== bulkThreadsAfter.length) {
-            //     throw `Bulk length before and after not equal, before: ${bulkThreadsBefore.length}, after: ${bulkThreadsAfter.length}`;
-            // }
-            // for(let i = 0; i < bulkThreadsAfter.length; i++) {
-            //     if(bulkThreadsBefore[i][0] !== bulkThreadsAfter[i][0] || bulkThreadsBefore[i][1] !== bulkThreadsAfter[i][1]) {
-            //         throw `Bulk before and after not equal, before: ${bulkThreadsBefore[i]}, after: ${bulkThreadsAfter[i]}`;
-            //     }
-            // }
-
         }
     }
 
@@ -180,6 +163,7 @@ class ScriptManager {
             try {
                 let threadObject = this.threadManager.peekIndividualThreads(growThreads);
                 if(threadObject.length === 0) {
+                    this.ns.tprint(threadObject);
                     threadObject = this.threadManager.peekIndividualThreads(growThreads, true);
                     failedToFullGrow = true;
                     this.ns.tprint(`Grow: Not enough machines for ${growThreads} threads. Using ${threadObject.reduce((total, object) => total + object.threads, 0)} threads instead.`);
@@ -245,45 +229,42 @@ class ScriptManager {
     }
 
     async drainServers() {
-        let drainCutoff = this.args["drain-cutoff"];
-        let drainableServers = this.openServers.filter((server) => server.server.moneyAvailable > 0);
-
-        let beginnerServers = drainableServers.filter(server => server.server.requiredHackingSkill < 100);
-        if (beginnerServers.length === 0) {
-            drainableServers = drainableServers.slice(drainCutoff);
-        } else {
-            // Set drainableServers to all servers with hacking level < 100 except for the best server (which will be farmed).
-            drainableServers = beginnerServers;
-            let bestServerIndex = beginnerServers.indexOf(this.bestServer);
-            if (bestServerIndex !== -1) {
-                drainableServers.splice(bestServerIndex, 1);
-            }
+        this.ns.tprint("**** Open - Start ****");
+        for(let operation of this.neededDrainOperations) {
+            this.ns.tprint(`${operation.server}: ${operation.weakenNeeded} weaken, ${operation.hackNeeded} hack. Waiting on weaken: ${operation.waitOnWeaken}`);
         }
+        this.ns.tprint("**** Open - End ****");
+
+        let drainableServers = this.openServers.filter((server) => this.ns.getServerMoneyAvailable(server.name) > 0);
 
         // Remove servers which already have their operations determined
         drainableServers = drainableServers.filter(server => typeof (this.neededDrainOperations.find(operation => operation.server === server.name)) === "undefined");
 
-        if (drainableServers.length === 0) {
+        if (drainableServers.length === 0 && this.neededDrainOperations.length === 0) {
             return;
         }
 
         const player = this.ns.getPlayer();
 
+        let string = "";
         for (let server of drainableServers) {
+            string += server.name + ", ";
             let weakenNeeded = 0;
+            let weakenTime = 0;
             let waitOnWeaken = false;
 
             const securityLevel = this.ns.getServerSecurityLevel(server.name)
             if (securityLevel > server.server.minDifficulty) {
                 weakenNeeded = Math.ceil((securityLevel - server.server.minDifficulty) / 0.05);
+                weakenTime = Formulas.calculateWeakenTime(server.server, player, this.ns.getServerSecurityLevel(server.name));
                 waitOnWeaken = true;
             }
 
             const percentHacked = Formulas.calculatePercentMoneyHacked(this.ns, server.server, player, server.server.minDifficulty);
             const serverBalance = this.ns.getServerMoneyAvailable(server.name);
             const hackedNeeded = Math.ceil(serverBalance / Math.floor(serverBalance * percentHacked));
+            this.ns.tprint(`p: ${percentHacked}, b: ${serverBalance}, h: ${hackedNeeded}`);
 
-            const weakenTime = Formulas.calculateWeakenTime(server.server, player, this.ns.getServerSecurityLevel(server.name));
             const hackTime = Formulas.calculateHackingTime(server.server, player);
 
             this.neededDrainOperations.push({
@@ -297,18 +278,42 @@ class ScriptManager {
             });
         }
 
+        this.ns.tprint("Found drainable servers to be " + string);
+
         // So that faster drains are completed first. Increases the amount of early income in a wipe
         this.neededDrainOperations.sort((a, b) => a.totalTime - b.totalTime);
 
+        // Remove best server because it is possible it becomes best server after an initial drain.
+        // Also removes home because it should not be drained
+        this.neededDrainOperations = this.neededDrainOperations.filter(operation => operation.server !== this.bestServer.name && operation.server !== "home");
+
         for (let i = 0; i < this.neededDrainOperations.length; i++) {
             let operation = this.neededDrainOperations[i];
+            if(isNaN(operation.hackNeeded)) {
+                this.ns.tprint("**** NaN - Start ****");
+                for(let operation of this.neededDrainOperations) {
+                    this.ns.tprint(`${operation.server}: ${operation.weakenNeeded} weaken, ${operation.hackNeeded} hack. Waiting on weaken: ${operation.waitOnWeaken}`);
+                }
+                this.ns.tprint("**** NaN - End ****");
+
+                this.ns.tprint(drainableServers);
+
+                throw "NaN hacked needed";
+            }
+
+
             if (operation.weakenNeeded > 0) {
                 try {
                     let threadObject = this.threadManager.peekBulkThreads(operation.weakenNeeded, true);
-                    this.ns.tprint(threadObject);
                     this.ns.tprint(`Starting drain weaken on ${operation.server} with ${threadObject.threads} threads. It will take ${formatSeconds(operation.weakenTime)}`);
                     await this.performLargeOperation(DRAIN_WEAKEN_SCRIPT_NAME, DRAIN_WEAKEN_RESULT_PORT, operation.server, operation.weakenTime, threadObject);
                     operation.weakenNeeded -= threadObject.threads;
+
+                    // Recalculate the weaken time because it is now reduced
+                    const newWeakenTime = Formulas.calculateWeakenTime(this.openServers.find(server => server.name === operation.server).server, player, this.ns.getServerSecurityLevel(operation.server));
+                    operation.weakenTime = newWeakenTime
+                    operation.totalTime = newWeakenTime + operation.hackTime;
+
                 } catch (e) {
                     // no server available. Ignore the error because it will loop again
                 }
@@ -316,10 +321,30 @@ class ScriptManager {
             if (!operation.waitOnWeaken && operation.hackNeeded > 0) {
                 try {
                     let threadObject = this.threadManager.peekBulkThreads(operation.hackNeeded, true);
-                    this.ns.tprint(threadObject);
                     this.ns.tprint(`Starting drain hack on ${operation.server} with ${threadObject.threads} threads. It will take ${formatSeconds(operation.hackTime)}`);
                     await this.performLargeOperation(DRAIN_HACK_SCRIPT_NAME, DRAIN_HACK_RESULT_PORT, operation.server, operation.hackTime, threadObject);
-                    operation.hackNeeded -= threadObject.threads;
+
+                    // If the full hack wasn't perform then I cannot accurately determine how much is left. Delete the operation so that it can be redetermined as a whole
+                    if(threadObject.threads !== operation.hackNeeded) {
+                        this.ns.tprint(`"**** Pre ${operation.server} splice - Start ****"`);
+                        for(let operation of this.neededDrainOperations) {
+                            this.ns.tprint(`${operation.server}: ${operation.weakenNeeded} weaken, ${operation.hackNeeded} hack. Waiting on weaken: ${operation.waitOnWeaken}`);
+                        }
+                        this.ns.tprint(`"**** Pre ${operation.server} splice - End ****"`);
+
+                        this.neededDrainOperations.splice(i, 1);
+
+                        this.ns.tprint(`"**** Post ${operation.server} splice - Start ****"`);
+                        for(let operation of this.neededDrainOperations) {
+                            this.ns.tprint(`${operation.server}: ${operation.weakenNeeded} weaken, ${operation.hackNeeded} hack. Waiting on weaken: ${operation.waitOnWeaken}`);
+                        }
+                        this.ns.tprint(`"**** Post ${operation.server} splice - End ****"`);
+                        i--;
+                    } else {
+                        this.ns.tprint(`${operation.hackNeeded} -= ${threadObject.threads}`);
+                        operation.hackNeeded -= threadObject.threads;
+                    }
+
                 } catch (e) {
                     // no server available. Ignore the error because it will loop again
                 }
@@ -329,7 +354,11 @@ class ScriptManager {
         let portResult = await this.ns.readPort(DRAIN_WEAKEN_RESULT_PORT);
         while (portResult !== "NULL PORT DATA") {
             let foundOperation = this.neededDrainOperations.find(operation => operation.server === portResult.target);
-            if (typeof (foundOperation) !== "undefined" && foundOperation.weakenNeeded !== 0) {
+            if(typeof (foundOperation) === "undefined") {
+                throw "**** Failed to find operation for " + JSON.stringify(portResult);
+            }
+
+            if (typeof (foundOperation) !== "undefined" && foundOperation.weakenNeeded === 0) {
                 foundOperation.waitOnWeaken = false;
                 foundOperation.totalTime -= foundOperation.weakenTime;
                 foundOperation.weakenTime = 0;
@@ -346,7 +375,9 @@ class ScriptManager {
                     this.ns.tprint(`Failed drain hack on ${portResult.target} with ${portResult.identifier} threads.`);
                     this.neededDrainOperations[indexOfOperation].hackNeeded += portResult.identifier;
                 } else {
+                    this.ns.tprint("Length pre-slice: " + this.neededDrainOperations.length);
                     this.neededDrainOperations.splice(indexOfOperation, 1);
+                    this.ns.tprint("Length post-slice: " + this.neededDrainOperations.length);
                     this.ns.tprint(`Completed drain hack on ${portResult.target} with ${portResult.identifier} threads earning ${portResult.result}.`);
                 }
             } else {
@@ -355,6 +386,12 @@ class ScriptManager {
 
             portResult = await this.ns.readPort(DRAIN_HACK_RESULT_PORT);
         }
+
+        this.ns.tprint("**** Close - Start ****");
+        for(let operation of this.neededDrainOperations) {
+            this.ns.tprint(`${operation.server}: ${operation.weakenNeeded} weaken, ${operation.hackNeeded} hack. Waiting on weaken: ${operation.waitOnWeaken}`);
+        }
+        this.ns.tprint("**** Close - End ****");
 
     }
 
@@ -390,7 +427,6 @@ class ScriptManager {
                 let usableServers = scanResults.openServers.concat(scanResults.rootedServers);
                 await this.prepareServers(usableServers);
                 this.threadManager.addNewServers(usableServers);
-                this.threadManager.print();
 
                 this.openServers = this.openServers.concat(scanResults.openServers);
                 this.rootedServers = this.rootedServers.concat(scanResults.rootedServers);
@@ -553,8 +589,6 @@ class ThreadManager {
             }
 
         }
-
-        this.ns.tprint(`Home: ${this.bulkThreads.get("home")}`);
     }
 
     peekBulkThreads(threads, scaleToPossible = false) {
@@ -580,11 +614,11 @@ class ThreadManager {
     }
 
     peekIndividualThreads(threads, scaleToPossible = false) {
+        const possibleServers = this.#getUsableServers();
         if (this.individualThreads > threads || scaleToPossible) {
             let threadsRemaining = threads;
             let threadAllocations = [];
 
-            const possibleServers = this.#getUsableServers();
             for (let i = 0; i < possibleServers.length && threadsRemaining > 0; i++) {
                 let server = possibleServers[i];
                 let threads = server[1];
@@ -596,7 +630,9 @@ class ThreadManager {
                 threadAllocations.push({server: server[0], threads: threads});
             }
 
+            this.ns.tprint(threadsRemaining);
             if (threadsRemaining > 0 && !scaleToPossible) {
+                this.ns.tprint("Failed to get all");
                 return [];
             }
 

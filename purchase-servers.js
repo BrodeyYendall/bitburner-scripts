@@ -12,11 +12,7 @@ export async function main(ns) {
     let currentServers = [];
     if (args["sell-old"] === "yes") {
         currentServers = ns.getPurchasedServers();
-
-        const preFilterLength = currentServers.length;
         currentServers = currentServers.filter(serverName => ns.getServerMaxRam(serverName) >= ram);
-
-        serversToBuy -= preFilterLength - currentServers.length;
     }
 
     const serverCost = ns.getPurchasedServerCost(ram);
