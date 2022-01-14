@@ -1,11 +1,11 @@
 # Faction To Complete:
 ## Early Game
-                    CyberSec:
-                        Hack CSEC manually
-                    Tian Di Hui: -- Amazing for rep farming but very little for hacking
-                        $1,000,000
-                        Hacking 50
-                        Be in Chongquin, New Tokyo, or Ishima
+                            CyberSec:
+                                Hack CSEC manually
+    Tian Di Hui: -- Amazing for rep farming but very little for hacking
+        $1,000,000
+        Hacking 50
+        Be in Chongquin, New Tokyo, or Ishima
     Netburners:
         Total Hacknet levels 100
         Hacking 80
@@ -25,7 +25,7 @@
         Be in Ishima
         $30,000,000
         Not in city factions Sector-12, Aevum, or Volhaven
-    Aevum:
+    Aevum: -- Start with DeepScan and Autolink
         Be in Aevum
         $40,000,000
     Volhaven:
@@ -34,12 +34,12 @@
         Not in any other city faction
 
 ## Hacker Groups
-                NiteSec:
-                    Hack avmnite-02h manually
-                    Home RAM at least 32
-                The Black Hand:
-                    Hack I.I.I.I manually
-                    Home RAM of 64 GB
+    NiteSec:
+        Hack avmnite-02h manually
+        Home RAM at least 32
+    The Black Hand:
+        Hack I.I.I.I manually
+        Home RAM of 64 GB
     BitRunners:
         Hack run4theh111z manually
         Home RAM of 128 GB

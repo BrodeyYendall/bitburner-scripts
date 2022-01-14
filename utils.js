@@ -1,4 +1,5 @@
 import * as ServerScan from "ServerScan.js"
+import {calculatePercentMoneyHacked} from "./editted-formula";
 
 // noinspection JSUnusedGlobalSymbols
 /** @param {NS} ns **/
@@ -12,8 +13,11 @@ export async function main(ns) {
         case "find-server":
             findServer(ns, args);
             break;
+        case "growth":
+            determineGrowthFunctions(ns, args);
+            break;
         case "test":
-            determineGrowthFunctions(ns);
+            test(ns, args);
             break;
     }
 }
@@ -45,23 +49,28 @@ export function findServer(ns, args) {
     }
 }
 
-export function determineGrowthFunctions(ns) {
+export function determineGrowthFunctions(ns, args) {
     let search = ServerScan.breathFirstScan(ns);
     let servers = search.openServers;
 
-    for (let server of servers) {
-        //Get adjusted growth rate, which accounts for server security
-        let adjGrowthRate = 1 + (1.03 - 1) / server.server.minDifficulty;
-        if (adjGrowthRate > 1.0035) {
-            adjGrowthRate = 1.0035;
+    if(args["values"] !== null) {
+        const serverToFind = args["values"].toLowerCase();
+        let searchedServer = servers.find(node => node.name.toLowerCase() === serverToFind);
+        if (typeof (searchedServer) === "undefined") {
+            ns.tprint("Failed to find server " + args["values"]);
+            return;
+        } else {
+            servers = [searchedServer];
         }
+    }
 
-        const moneyAvailable = server.server.moneyMax * 0.5;
+    for (let server of servers) {
+        let bulkThreadFormula = `y = ((1 + (1.03 - 1) / ${server.server.minDifficulty})^((${server.server.serverGrowth} / 100))) ^ x`;
 
-        let individualThreadFormula = `${moneyAvailable} * (1 + (1.03 - 1) / a)^((b / 100) * x * c)`;
-        let bulkThreadFormula = `${moneyAvailable} * ((1 + (1.03 - 1) / a)^((b / 100) * c)) ^ x`;
-
-        ns.tprint(`${server.name}: ${individualThreadFormula} = ${bulkThreadFormula}`);
+        ns.tprint(`${server.name}: ${bulkThreadFormula}`);
     }
 }
 
+export function test(ns, args) {
+
+}

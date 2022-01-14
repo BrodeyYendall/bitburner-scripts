@@ -4,8 +4,8 @@ My scripts which I use for game BitBurner by danielyxie https://github.com/danie
 ## Hacking
 ### Bugs
 * Drain only works for the first initial loops
-* calculateMaxHack is calculating incorrect values 
-* Drain not accurately committing threads resulting in overallocation of threads during farm
+* calculateMaxHack is calculating incorrect values
+* If drain port is full then threads will be release prematurely
 
 ### Features
 * Time weaken such that it occurs simultaneously with other operations, reducing downtime
